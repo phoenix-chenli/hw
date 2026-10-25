@@ -1,0 +1,41 @@
+# 行简 · 研学工作台
+
+面向华为 ICT 创新赛赛题 2「基于华为云 AgentArts 智能体开发平台的 Agent 设计和应用」。
+
+把研究资料、结论依据、后续行动与成果草稿连接起来：资料更新后逐项复核，任务中断后留下继续点，安排时间前预览冲突并确认。
+
+## 从哪里开始
+
+- [项目说明书与修改计划（原 Word）](行简研学_项目说明书与修改计划_20261023.docx)：保留原文件，包含整体构想与计划。
+- [可运行工程与使用指南](xingjian-workbench/README.md)：当前实现及操作入口。
+- [本阶段功能、实际截图和验证记录](xingjian-workbench/docs/PHASE-03B.md)：任务继续点、时间安排预览、课内提醒与失败恢复。
+- [后续开发路线](xingjian-workbench/docs/ROADMAP.md)：成果导出、AgentArts 接入等待办。
+- [本次同步说明](同步说明_20261025.md)：代码来源与保留范围。
+
+## 本地启动
+
+需要 Node.js 22.14 或更新版本，在仓库目录执行：
+
+```sh
+cd xingjian-workbench
+npm ci
+npm run build
+npm start
+```
+
+打开 http://127.0.0.1:8787，选择「体验一个示例」即可操作。示例为合成资料；你创建的内容保存在本机 `.runtime/workspace.json`，不提交到 GitHub。
+
+无需 DevEco 或手机原生 SDK。当前是单用户本地 Web 工作台；AgentArts、云模型与 JATS 排版尚未接入，也未部署在线服务。不能将本地验证视为华为云平台验收。原 Word 中的规划能力，以工程当前说明的已完成/待办状态为准。
+
+## 自动检查
+
+[GitHub Actions](https://github.com/phoenix-chenli/hw/actions) 对 main 的每次提交运行 Linux/Windows 核心测试和生产构建，并在 Linux 运行浏览器流程。实际结果以对应提交为准。
+
+```sh
+cd xingjian-workbench
+npm test
+npm run build
+npm run test:browser
+```
+
+本地浏览器测试使用已有 Chrome，不自动安装原生环境。根目录工作流已配置子目录路径。

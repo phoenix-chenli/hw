@@ -1,0 +1,143 @@
+{
+  "schema_version": "xingjian.source-baseline.v1",
+  "verified_at": "2026-10-23T15:17:31.310188+00:00",
+  "scope": "Read-only source provenance and integration boundaries; no source repository mutation or native verification.",
+  "sources": [
+    {
+      "id": "campusflow",
+      "product": "行简 / CampusFlow",
+      "repository": "https://github.com/haohao6666666/CampusFlow-Personal",
+      "branch": "dev/haohao",
+      "commit": "46ad246e366c3d8d802b48266d5da8169939b19e",
+      "visibility": "private",
+      "verified_current_branch": true,
+      "license": {
+        "github_detected": null,
+        "root_license_files": [],
+        "status": "No project-level license found in checked root; do not infer redistribution rights."
+      },
+      "source_evidence": [
+        "agent-service/src/campusflow_agent/action_service.py",
+        "agent-service/src/campusflow_agent/schemas.py",
+        "agent-service/src/campusflow_agent/api.py"
+      ],
+      "adapter_boundary": "Planning preview, versioned course/task snapshot, explicit confirmation and durable execution receipt. Keep account identity at the gateway.",
+      "preserve": [
+        "Check current state and expiry when confirming.",
+        "Repeated confirmation returns the original receipt.",
+        "SQLite transaction commits real plan changes atomically.",
+        "Course-overlap permission requires explicit current acknowledgement; do not silently override."
+      ],
+      "integration_status": "Source capability audited; no new integrated adapter or cloud verification claimed."
+    },
+    {
+      "id": "zhiheng",
+      "product": "知衡",
+      "repository": "https://github.com/haohao6666666/F8-012-Zhiheng",
+      "branch": "main",
+      "commit": "b441baae6e1d66c8e1f4f6733bade8c5d58bf778",
+      "visibility": "private",
+      "verified_current_branch": true,
+      "license": {
+        "github_detected": null,
+        "root_license_files": [],
+        "third_party_evidence": [
+          "source/models/multilingual-e5-small/LICENSE",
+          "source/第三方许可/",
+          "source/tests/fixtures/complex_queries/chinook-LICENSE.txt",
+          "source/tests/fixtures/complex_queries/northwind-LICENSE.txt"
+        ],
+        "status": "Third-party notices are present; they do not grant a license to the project as a whole."
+      },
+      "source_evidence": [
+        "source/backend/answer_contract.py",
+        "source/backend/product_api.py",
+        "source/backend/main.py"
+      ],
+      "adapter_boundary": "Evidence analysis result with source revisions, claim and calculation links, source-location precision and current-scope validation.",
+      "preserve": [
+        "Maintain source_revisions and context_revision.",
+        "Do not invent original-page positions or evidence links absent from saved results.",
+        "Retain read-only bounded queries/calculations and separate analysis from plan mutation.",
+        "Legacy projected records remain distinguishable from fully recorded current results."
+      ],
+      "integration_status": "Source capability audited; no integrated source-change propagation or shared identity claimed."
+    },
+    {
+      "id": "zhitu",
+      "product": "知途",
+      "repository": "https://github.com/haohao6666666/bang",
+      "branch": "main",
+      "commit": "23e2c294c92ee5ebd8d819406670bb8673ee22d2",
+      "visibility": "public",
+      "verified_current_branch": true,
+      "license": {
+        "github_detected": null,
+        "root_license_files": [],
+        "status": "No project-level license found in root or cached tree; public visibility is not a license."
+      },
+      "source_evidence": [
+        "docs/ARCHITECTURE.md",
+        "server/cloud-api.mjs",
+        "server/cloud-storage.mjs",
+        "server/companion.mjs"
+      ],
+      "adapter_boundary": "User-confirmed progress events and resumable work points with opt-in contextual memory; do not copy anonymous browser identity into team authentication.",
+      "preserve": [
+        "Time spent does not imply task completion.",
+        "Memory is scoped to a user and requires consent before content transmission.",
+        "Local work remains saved when model/background processing fails.",
+        "Existing browser tokens and private memory must not migrate into examples."
+      ],
+      "integration_status": "Source capability audited; shared project progress and team identity adapter not implemented."
+    },
+    {
+      "id": "jatscraft",
+      "product": "JATSCraft Studio",
+      "repository": "https://github.com/haohao6666666/HNZ-JATSCraft-Studio-2",
+      "branch": "main",
+      "commit": "ac62cb7435fb8089db3f311e3b6a33839f3394b4",
+      "visibility": "public",
+      "verified_current_branch": true,
+      "license": {
+        "github_detected": null,
+        "root_license_files": [],
+        "third_party_evidence": [
+          "02_程序代码/THIRD_PARTY_NOTICES.md",
+          "02_程序代码/runtime/macos-python3.13/"
+        ],
+        "status": "Third-party/runtime notices exist; no project-level license found in checked root. Audit assets, fonts and schemas before reuse."
+      },
+      "source_evidence": [
+        "02_程序代码/jatscraft/pipeline.py",
+        "02_程序代码/jatscraft/model.py",
+        "02_程序代码/jatscraft/compiler.py",
+        "02_程序代码/jatscraft/quality_gates.py"
+      ],
+      "adapter_boundary": "New restricted ReportSpec-to-JATS adapter followed by isolated job-based XML-to-PDF worker; do not pass arbitrary report JSON directly into DocumentIR.",
+      "preserve": [
+        "Carry source/evidence and report version metadata through export.",
+        "Constrain report template and supported JATS subset in first release.",
+        "Verify fonts, XeLaTeX environment and output files in a later explicit worker spike.",
+        "Keep compile status separate from content correctness and from publication readiness."
+      ],
+      "integration_status": "Source capability audited; new report adapter and cloud worker not implemented or tested."
+    }
+  ],
+  "do_not_copy": [
+    "API keys, access tokens, local .env files, personal provider configuration or credential stores",
+    "SQLite databases, private uploads, conversation histories, browser tokens, focus logs, account details and school records",
+    "Local caches, vector/model stores, test execution artifacts, exported user reports and logs",
+    "Bundled macOS/Windows runtimes, virtual environments, node_modules, SDKs or large model binaries",
+    "Unreviewed sample documents, licensed fonts, journal mastheads, schemas or third-party assets"
+  ],
+  "phase_one_boundaries": [
+    "Create a separate private repository with independent history; do not modify original repositories or their main/dev branches.",
+    "Keep pinned source commits and per-module provenance; do not flatten the four repositories into a new blanket license.",
+    "Use synthetic clearly labeled fixtures for first local scenario and state all external adapters honestly as unconnected.",
+    "Prioritize one scenario: a source revision marks linked claims, tasks and report sections for review, without claiming semantic discovery of all impacts.",
+    "Persist concrete state changes only after user confirmation; stale snapshots and repeated submissions must be handled.",
+    "No native SDK installation, no device validation and no paid model or AgentArts invocation is part of this source-baseline audit.",
+    "Do not claim a functional integrated product, actual AgentArts execution, multi-user authorization or PDF compilation from source inspection or mock UI alone."
+  ]
+}

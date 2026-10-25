@@ -1,0 +1,30 @@
+{
+  "name": "xingjian-ict-agentarts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "build": "tsc --noEmit && vite build",
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "test": "node scripts/test.mjs",
+    "check": "npm test && npm run build",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.0",
+    "@vitejs/plugin-react": "4.5.0",
+    "typescript": "5.8.3",
+    "vite": "6.4.5"
+  }
+}

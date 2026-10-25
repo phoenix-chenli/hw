@@ -1,0 +1,343 @@
+.analysis-workbench {
+  display: grid;
+  grid-template-columns: minmax(290px, 0.82fr) minmax(0, 1.3fr);
+  gap: 24px;
+  align-items: start;
+}
+.analysis-input,
+.analysis-result {
+  padding: 26px;
+  min-width: 0;
+}
+.analysis-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.analysis-input h2 {
+  font-size: 20px;
+  line-height: 1.6;
+}
+.analysis-help {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 12px 0;
+}
+.analysis-mode {
+  display: flex;
+  padding: 4px;
+  gap: 6px;
+  margin: 24px 0;
+  border: 0;
+  border-radius: 12px;
+  background: #f0f4fa;
+}
+.analysis-mode button {
+  flex: 1;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 12px 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  min-height: 44px;
+}
+.analysis-mode button[aria-pressed="true"] {
+  background: white;
+  color: var(--blue);
+  box-shadow: 0 1px 4px #18253b12;
+}
+.analysis-sources {
+  margin: 22px 0;
+  padding: 0;
+  border: 0;
+}
+.analysis-sources legend {
+  font-weight: 600;
+  margin-bottom: 12px;
+  width: 100%;
+}
+.analysis-sources legend span {
+  color: var(--muted);
+  font-size: 12px;
+  float: right;
+  font-weight: 400;
+}
+.analysis-sources label {
+  display: flex;
+  gap: 12px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  align-items: flex-start;
+}
+.analysis-sources label:hover,
+.analysis-task:hover {
+  background: #f7faff;
+}
+.analysis-sources label span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.analysis-sources small,
+.analysis-choice small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 4px;
+}
+.analysis-workbench input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--blue);
+}
+.analysis-run {
+  width: 100%;
+  min-height: 46px;
+}
+.analysis-input .field {
+  margin-bottom: 18px;
+}
+.analysis-empty {
+  padding: 42px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--muted);
+  gap: 16px;
+  line-height: 1.8;
+}
+.analysis-empty h3 {
+  color: #243750;
+  font-size: 18px;
+}
+.analysis-empty > svg {
+  color: var(--blue);
+}
+.analysis-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  font-size: 12px;
+  margin-top: 16px;
+}
+.analysis-steps span {
+  border-bottom: 2px solid #d9e7ff;
+  padding: 4px 0;
+}
+.analysis-history {
+  margin: 0 0 22px;
+}
+.analysis-history label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.analysis-warning,
+.analysis-notice {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  margin: 16px 0;
+  border-radius: 10px;
+  line-height: 1.8;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.analysis-warning {
+  color: #77511b;
+  background: #fff8e9;
+  border: 1px solid #f2e4c7;
+}
+.analysis-notice {
+  color: #255d47;
+  background: #eff8f3;
+  border: 1px solid #d5e9df;
+}
+.analysis-warning > svg,
+.analysis-notice > svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.analysis-warning .text-button {
+  margin-top: 10px;
+  min-height: 36px;
+}
+.analysis-candidates {
+  margin-top: 24px;
+}
+.analysis-candidates h3,
+.analysis-gaps h3 {
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+.analysis-candidates h3 > span {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.analysis-candidate {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+}
+.analysis-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  line-height: 1.8;
+}
+.analysis-choice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.analysis-choice p {
+  white-space: pre-wrap;
+}
+.analysis-choice small {
+  margin: 0 0 6px;
+}
+.analysis-evidence {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  padding: 14px 0 0;
+  margin-top: 14px;
+  text-align: left;
+  gap: 9px;
+  color: var(--blue);
+  align-items: flex-start;
+}
+.analysis-evidence > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.analysis-evidence > span {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.analysis-evidence small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.calculation-detail {
+  background: #f4f7fc;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 14px 0 0 30px;
+  overflow-wrap: anywhere;
+}
+.calculation-detail span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.calculation-detail code {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #284c7b;
+}
+.analysis-gaps {
+  margin: 24px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.analysis-gaps h3 {
+  color: #243750;
+}
+.analysis-gaps ul {
+  padding-left: 18px;
+  margin: 0;
+}
+.analysis-gaps li + li {
+  margin-top: 6px;
+}
+.analysis-task {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+.analysis-confirm {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.analysis-confirm p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.analysis-confirm button {
+  min-height: 44px;
+}
+.analysis-trace {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.analysis-trace summary {
+  cursor: pointer;
+  min-height: 30px;
+}
+.analysis-trace p {
+  margin-top: 10px;
+}
+.analysis-trace code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.analysis-trace > div {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+@media (max-width: 1150px) {
+  .analysis-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .analysis-input,
+  .analysis-result {
+    padding: 20px 16px;
+  }
+  .analysis-confirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .analysis-candidate {
+    padding: 12px;
+  }
+  .calculation-detail {
+    margin-left: 0;
+  }
+}
