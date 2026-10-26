@@ -5,6 +5,9 @@ export interface EvidenceTarget {
   claimId?: string;
   analysisId?: string;
   candidateId?: string;
+  agentRunId?: string;
+  agentCandidateId?: string;
+  evidenceId?: string;
 }
 export interface EvidenceLocation {
   kind: "span" | "lines" | "unlocated";

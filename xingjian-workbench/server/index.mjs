@@ -26,11 +26,11 @@ server.once("error", (err) => {
   process.exitCode = 1;
 });
 server.listen(port, "127.0.0.1", () =>
-  console.log(`行简本地基础版：http://127.0.0.1:${port}（AgentArts 尚未接入）`),
+  console.log(`行简本地工作台：http://127.0.0.1:${port}（云端状态请查看资料分析页；配置齐备不代表已验证）`),
 );
 function shutdown() {
   server.close(() => {
-    void server.reportJobs.close().then(() => store.close());
+    void Promise.allSettled([server.reportJobs.close(), server.agentRuns.close()]).then(() => store.close());
   });
   server.closeAllConnections();
 }

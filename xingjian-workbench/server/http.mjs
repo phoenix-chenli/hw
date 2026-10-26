@@ -11,6 +11,7 @@ import {
 } from "./domain.mjs";
 import { reportToJats, reportToHtml } from "./report-render.mjs";
 import { PdfJobs } from "./pdf-jobs.mjs";
+import { AgentRuns } from "./agent-runs.mjs";
 
 const LOCAL_OWNER = "local-user";
 const MAX_BODY = 256 * 1024;
@@ -72,9 +73,10 @@ async function body(request) {
 
 export function createApp(
   store,
-  { staticDir, allowedPorts = [8787, 5173, 4173], pdfJobs } = {},
+  { staticDir, allowedPorts = [8787, 5173, 4173], pdfJobs, agentProvider } = {},
 ) {
   const exports = pdfJobs ?? new PdfJobs(store.file + ".exports");
+  const agentRuns = new AgentRuns(store, { provider: agentProvider });
   const allowedAuthorities = new Set(
     allowedPorts.flatMap((port) => [`127.0.0.1:${port}`, `localhost:${port}`]),
   );
@@ -124,7 +126,8 @@ export function createApp(
             stage: 5,
             evidenceInspection: "recorded-text-positions",
             sourceComparison: "bounded-line-diff",
-            agentArts: "not-connected",
+            agentArts: agentRuns.configuration().configured ? "configured-unverified" : "not-connected",
+            agentRunProtocol: "versioned-snapshot-proposal-v1",
             reportExport: "fixed-template-local",
             pdfEngine: "existing-browser-worker",
             sourceAnalysis: "local-keyword-and-csv",
@@ -136,6 +139,20 @@ export function createApp(
             storage: "local-file",
             account: "local-development-only",
           });
+        if (request.method === "GET" && url.pathname === "/api/agent-runs/config")
+          return json(response, 200, agentRuns.configuration());
+        if (request.method === "POST" && url.pathname === "/api/agent-runs") {
+          const input = await body(request);
+          if (!input || typeof input !== "object" || Array.isArray(input) || typeof input.authorizeCloud !== "boolean")
+            throw fail("INVALID_AGENT_REQUEST", "请提供有效请求并明确本次资料发送授权。", 400);
+          return json(response, 200, agentRuns.start(LOCAL_OWNER, input));
+        }
+        if (request.method === "POST" && url.pathname === "/api/agent-runs/interrupt") {
+          const input = await body(request);
+          if (!input || typeof input !== "object" || Array.isArray(input))
+            throw fail("INVALID_AGENT_REQUEST", "运行请求无效。", 400);
+          return json(response, 200, agentRuns.interrupt(LOCAL_OWNER, input.projectId, input.runId));
+        }
         if (
           request.method === "POST" &&
           url.pathname.startsWith("/api/reports/")
@@ -285,10 +302,13 @@ export function createApp(
           return json(response, 200, preview);
         }
         if (request.method === "POST" && url.pathname === "/api/commands") {
+          const command = await body(request);
+          if (command?.type === "create_agent_run")
+            throw fail("INTERNAL_COMMAND", "运行请求请使用分析入口，不能自行注入运行状态。", 400);
           return json(
             response,
             200,
-            store.command(LOCAL_OWNER, await body(request)),
+            store.command(LOCAL_OWNER, command),
           );
         }
         throw fail("NOT_FOUND", "接口不存在。", 404);
@@ -345,7 +365,9 @@ export function createApp(
   server.requestTimeout = 15000;
   server.headersTimeout = 10000;
   server.reportJobs = exports;
+  server.agentRuns = agentRuns;
   server.once("close", () => {
+    void agentRuns.close().catch(() => { /* Persisted active runs recover on restart. */ });
     void exports.close();
   });
   return server;

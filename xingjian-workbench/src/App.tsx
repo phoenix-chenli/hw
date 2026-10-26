@@ -60,6 +60,7 @@ import EvidenceDialog from "./EvidenceDialog";
 import SourceVersionCompare from "./SourceVersionCompare";
 import TextDiff from "./TextDiff";
 import ReviewQueue from "./ReviewQueue";
+import CloudAnalysisPanel from "./CloudAnalysisPanel";
 import type { EvidenceTarget } from "./evidence-types";
 
 type Page = "overview" | "materials" | "analysis" | "actions" | "artifacts";
@@ -980,7 +981,7 @@ export default function App() {
                   </div>
                 ) : page === "analysis" ? (
                   <span className="badge badge-blue">
-                    本地分析 · 云端未连接
+                    本地工具 · 云端按配置启用
                   </span>
                 ) : (
                   <button
@@ -1249,6 +1250,15 @@ export default function App() {
                     </details>
                   </section>
                 </>
+              )}
+              {page === "analysis" && workspace && (
+                <CloudAnalysisPanel
+                  key={`cloud-${project.id}`}
+                  project={project}
+                  workspace={workspace}
+                  onWorkspace={(state) => setWorkspace(previous => previous && previous.revision > state.revision ? previous : state)}
+                  onEvidence={viewEvidence}
+                />
               )}
               {page === "analysis" && workspace && (
                 <AnalysisPanel

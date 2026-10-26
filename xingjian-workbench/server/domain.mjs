@@ -26,6 +26,13 @@ import {
   validateReports,
   getReport,
 } from "./reports.mjs";
+import {
+  AgentProtocolError,
+  createAgentRun,
+  acceptAgentRun,
+  transitionAgentRun,
+  validateAgentRuns,
+} from "./agent-protocol.mjs";
 
 const LIMITS = Object.freeze({
   id: 160,
@@ -47,6 +54,8 @@ const COMMANDS = new Set([
   "set_task_status",
   "run_analysis",
   "accept_analysis",
+  "create_agent_run",
+  "accept_agent_run",
   "review_claim",
   "review_task",
   "review_artifact",
@@ -255,6 +264,7 @@ export function validateWorkspace(state) {
       }
       validatePlanningState(project, register);
       validateReports(project, register);
+      validateAgentRuns(project, register);
       for (const entry of array(project.activity, "活动记录")) {
         record(entry, "活动记录");
         register(entry.id, "活动 ID");
@@ -279,7 +289,8 @@ export function validateWorkspace(state) {
       error instanceof AnalysisError ||
       error instanceof ReviewError ||
       error instanceof PlanningError ||
-      error instanceof ReportError
+      error instanceof ReportError ||
+      error instanceof AgentProtocolError
     )
       throw new DomainError(
         "INVALID_STATE",
@@ -298,6 +309,19 @@ function ownedProject(state, ownerId, projectId) {
   );
   if (!project) fail("项目不存在或无权访问。", "NOT_FOUND", 404);
   return project;
+}
+
+/** Called only by the trusted local run manager, never exposed as a command. */
+export function applyAgentRunTransition(state, ownerId, projectId, runId, transition, options = {}) {
+  validateWorkspace(state);
+  const next = structuredClone(state);
+  const project = ownedProject(next, ownerId, projectId);
+  const run = project.agentRuns?.find(entry => entry.id === runId);
+  if (!run) fail("运行不存在或不属于此项目。", "NOT_FOUND", 404);
+  transitionAgentRun(project, run, transition, context(options).now);
+  next.revision += 1;
+  validateWorkspace(next);
+  return next;
 }
 
 function findSource(project, sourceId) {
@@ -564,7 +588,22 @@ export function applyCommand(state, ownerId, type, payload, options = {}) {
   } else {
     project = ownedProject(next, owner, payload.projectId);
     const claimMap = new Map(project.claims.map((entry) => [entry.id, entry]));
-    if (type === "save_report") {
+    if (type === "create_agent_run") {
+      const provider = enumValue(payload.provider, ["agentarts", "contract-test"], "运行来源");
+      if (payload.authorizeCloud !== true && payload.authorizeCloud !== false)
+        fail("请明确本次是否授权发送资料。");
+      const run = createAgentRun(project, payload.request, {
+        id: ctx.id("agent_run"), now: ctx.now, provider,
+        authorizeCloud: payload.authorizeCloud,
+      });
+      (project.agentRuns ??= []).push(run);
+      entityId = run.id;
+      addActivity(project, "保存资料快照分析请求；结论和行动尚未写入。", ctx);
+    } else if (type === "accept_agent_run") {
+      acceptAgentRun(project, payload, ctx);
+      entityId = payload.runId;
+      addActivity(project, "逐项确认分析提案，保留原始建议、依据版本与运行记录。引用校验不代表结论已获证实。", ctx);
+    } else if (type === "save_report") {
       const report = saveReport(project, payload, ctx);
       entityId = report.id;
       addActivity(

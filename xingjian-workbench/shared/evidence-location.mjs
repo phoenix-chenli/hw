@@ -11,6 +11,34 @@ const unknown = (
   description,
 });
 
+function agentLocation(project, target, source, version) {
+  const explicit = target.agentRunId !== undefined || target.agentCandidateId !== undefined || target.evidenceId !== undefined;
+  let run, candidate;
+  if (explicit) {
+    run = project.agentRuns?.find(item => item.id === target.agentRunId);
+    candidate = run?.proposal?.claims.find(item => item.id === target.agentCandidateId);
+  } else if (target.claimId) {
+    run = project.agentRuns?.find(item => item.status === "accepted" && item.acceptance?.claims.some(ref => ref.entityId === target.claimId));
+    const mapping = run?.acceptance?.claims.find(ref => ref.entityId === target.claimId);
+    candidate = run?.proposal?.claims.find(item => item.id === mapping?.candidateId);
+  }
+  if (!run || !candidate) return explicit ? unknown("无法对应本次运行及候选记录，未借用其他分析的位置。") : null;
+  const evidence = run.snapshot.evidence.find(ref =>
+    candidate.evidenceIds.includes(ref.id) &&
+    (target.evidenceId === undefined || ref.id === target.evidenceId) &&
+    ref.sourceId === source.id && ref.versionId === version.id &&
+    (target.locator === undefined || ref.locator === target.locator));
+  if (!evidence || !run.snapshot.sourceRevisions.some(ref => ref.sourceId === source.id && ref.versionId === version.id && ref.contentHash === evidence.contentHash))
+    return unknown("此引用与运行时留存的资料版本不一致，未作高亮。");
+  const { start, end, quote, startLine, endLine } = evidence;
+  const range = Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && end > start && end <= version.content.length
+    ? lineRangeForSpan(splitTextLines(version.content), start, end) : null;
+  if (!range || quote !== version.content.slice(start, end) || range.startLine !== startLine || range.endLine !== endLine)
+    return unknown("运行时留存的位置与此版本原文不一致，未作高亮。请核对原记录。");
+  return { kind: "span", start, end, startLine, endLine,
+    description: "已对应本次分析引用的固定资料片段。位置由后端留存，不是模型生成的页码；原文存在不代表它支持该结论。" };
+}
+
 /** Resolve only coordinates retained in a specific local analysis record.
  * The evidence text remains a locator description, never an executable query.
  */
@@ -21,6 +49,12 @@ export function resolveEvidenceLocation(project, target) {
     return unknown(
       "此引用的资料或历史版本无法读取，请检查原记录；没有切换到其他资料。",
     );
+  const explicitLocal = target.analysisId !== undefined || target.candidateId !== undefined;
+  const explicitAgent = target.agentRunId !== undefined || target.agentCandidateId !== undefined || target.evidenceId !== undefined;
+  if (explicitLocal && explicitAgent)
+    return unknown("引用混用了不同分析的标识，未借用其他记录的位置。");
+  if (target.agentRunId !== undefined || target.agentCandidateId !== undefined || target.evidenceId !== undefined)
+    return agentLocation(project, target, source, version);
   let run, candidate;
   if (target.analysisId !== undefined || target.candidateId !== undefined) {
     run = project.analyses?.find((item) => item.id === target.analysisId);
@@ -57,7 +91,7 @@ export function resolveEvidenceLocation(project, target) {
       (ref) => ref.sourceId === source.id && ref.versionId === version.id,
     )
   )
-    return unknown();
+    return explicitLocal ? unknown() : (agentLocation(project, target, source, version) ?? unknown());
   const lines = splitTextLines(version.content);
   if (
     candidate.kind === "excerpt" &&

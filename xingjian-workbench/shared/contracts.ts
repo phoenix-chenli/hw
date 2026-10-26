@@ -1,3 +1,4 @@
+import type { AgentRun } from "./agent-contracts";
 export type EntityStatus = "linked" | "needs_review";
 export interface SourceVersion {
   id: string;
@@ -98,6 +99,7 @@ export interface Activity {
 export interface Project {
   id: string;
   ownerId: string;
+  agentRuns?: AgentRun[];
   title: string;
   goal: string;
   deadline: string | null;
@@ -147,6 +149,8 @@ export type CommandType =
   | "set_task_status"
   | "run_analysis"
   | "accept_analysis"
+  | "create_agent_run"
+  | "accept_agent_run"
   | "review_claim"
   | "review_task"
   | "review_artifact"

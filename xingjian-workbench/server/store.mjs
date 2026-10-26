@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { applyCommand, emptyWorkspace, validateWorkspace } from "./domain.mjs";
+import { applyCommand, applyAgentRunTransition, emptyWorkspace, validateWorkspace } from "./domain.mjs";
 
 const MAX_FILE_BYTES = 24 * 1024 * 1024;
 const error = (code, message, status) =>
@@ -100,6 +100,20 @@ export class WorkspaceStore {
 
   state() {
     return structuredClone(this.document.workspace);
+  }
+
+  replayCommand(ownerId, command) {
+    if (!this.document.operations.some(op => op.id === command?.operationId)) return null;
+    // command() performs the same owner/fingerprint validation and never writes a replay.
+    return this.command(ownerId, command);
+  }
+
+  transitionAgentRun(ownerId, projectId, runId, transition, options = {}) {
+    const workspace = applyAgentRunTransition(this.document.workspace, ownerId, projectId, runId, transition, options);
+    const document = { ...this.document, workspace };
+    this.persist(document);
+    this.document = document;
+    return this.state();
   }
 
   command(ownerId, command) {
