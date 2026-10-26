@@ -59,6 +59,7 @@ import ReportPanel from "./ReportPanel";
 import EvidenceDialog from "./EvidenceDialog";
 import SourceVersionCompare from "./SourceVersionCompare";
 import TextDiff from "./TextDiff";
+import ReviewQueue from "./ReviewQueue";
 import type { EvidenceTarget } from "./evidence-types";
 
 type Page = "overview" | "materials" | "analysis" | "actions" | "artifacts";
@@ -199,6 +200,8 @@ export default function App() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const pendingCommand = useRef<Command | null>(null);
+  const reviewQueueHeading = useRef<HTMLHeadingElement>(null);
+  const returnToQueue = useRef(false);
   const project =
     workspace?.projects.find((item) => item.id === projectId) ??
     workspace?.projects[0];
@@ -208,6 +211,14 @@ export default function App() {
   const visibleVersion =
     source?.versions.find((item) => item.id === selectedVersionId) ??
     (source ? currentVersion(source) : undefined);
+
+  useEffect(() => {
+    if (reviewTarget || !returnToQueue.current) return;
+    returnToQueue.current = false;
+    // A saved row leaves the queue. Cancelled rows retain their original button.
+    if (!document.activeElement || document.activeElement === document.body)
+      reviewQueueHeading.current?.focus();
+  }, [reviewTarget]);
 
   useEffect(() => {
     if (!project) return;
@@ -478,16 +489,8 @@ export default function App() {
   const title = nav.find((item) => item.id === page)?.label ?? "项目首页";
 
   function nextReview() {
-    if (!project) return;
-    const claim = project.claims.find((item) => item.status === "needs_review");
-    const task = project.tasks.find((item) => item.reviewRequired);
-    const artifact = project.artifacts.find(
-      (item) => item.status === "needs_review",
-    );
-    if (claim) setReviewTarget({ kind: "claim", entityId: claim.id });
-    else if (task) setReviewTarget({ kind: "task", entityId: task.id });
-    else if (artifact)
-      setReviewTarget({ kind: "artifact", entityId: artifact.id });
+    reviewQueueHeading.current?.focus();
+    reviewQueueHeading.current?.scrollIntoView({ block: "start" });
   }
 
   function reviewButton(
@@ -1099,43 +1102,16 @@ export default function App() {
                       );
                     })}
                   </section>
-                  {changeCount > 0 && (
-                    <section className="change-banner">
-                      <span className="warning-icon">
-                        <GitBranch size={23} />
-                      </span>
-                      <div>
-                        <h3>来源发生变化，相关内容需要复核</h3>
-                        <p>
-                          {
-                            project.claims.filter(
-                              (item) => item.status === "needs_review",
-                            ).length
-                          }{" "}
-                          项结论 ·{" "}
-                          {
-                            project.tasks.filter((item) => item.reviewRequired)
-                              .length
-                          }{" "}
-                          项行动 ·{" "}
-                          {
-                            project.artifacts.filter(
-                              (item) => item.status === "needs_review",
-                            ).length
-                          }{" "}
-                          份草稿。仅追踪已建立的关联。
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="button subtle"
-                        onClick={nextReview}
-                      >
-                        开始逐项复核
-                        <ArrowRight size={16} />
-                      </button>
-                    </section>
-                  )}
+                  <ReviewQueue
+                    key={project.id}
+                    project={project}
+                    disabled={busy}
+                    headingRef={reviewQueueHeading}
+                    onReview={(target) => {
+                      returnToQueue.current = true;
+                      setReviewTarget(target);
+                    }}
+                  />
                   <div className="overview-grid">
                     <section className="panel">
                       <div className="panel-heading">
