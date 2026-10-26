@@ -255,7 +255,7 @@ test("hostile report text remains text in the downloaded offline HTML", async ({
   request,
 }) => {
   const created = await command(request, "create_project", {
-    title: "离线报告文本验证",
+    title: `离线报告文本验证 ${randomUUID()}`,
     goal: "人工录入内容按纯文字保留",
     deadline: null,
   });

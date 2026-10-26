@@ -539,6 +539,12 @@ export default function ReportPanel({
   const request: ReportRequest = { title, artifactIds, includeTasks };
   const reports = [...(project.reports ?? [])].reverse();
   const disabled = !!working;
+  useEffect(() => {
+    if (preview) previewHeading.current?.focus();
+  }, [preview]);
+  useEffect(() => {
+    if (error) errorBox.current?.focus();
+  }, [error]);
   function invalidate() {
     setPreview(null);
     setAcknowledged(false);
@@ -548,7 +554,6 @@ export default function ReportPanel({
   }
   function showError(message: string) {
     setError(message);
-    requestAnimationFrame(() => errorBox.current?.focus());
   }
   function move(index: number, direction: -1 | 1) {
     invalidate();
@@ -578,7 +583,6 @@ export default function ReportPanel({
       const result = await previewReport(project.id, request);
       setPreview(result);
       setStale(false);
-      requestAnimationFrame(() => previewHeading.current?.focus());
     } catch (err) {
       showError(
         err instanceof Error ? err.message : "暂时无法预览报告，请重试。",
