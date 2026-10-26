@@ -14,11 +14,34 @@ import type {
   Workspace,
 } from "../shared/contracts";
 import { ApiError, getWorkspace, makeCommand, submitCommand } from "./api";
+import { useSessionDraft } from "./session-drafts";
 
 type Fields = Pick<
   TaskCheckpoint,
   "doneNote" | "nextStep" | "blocker" | "evidence"
 >;
+type WorkDraft = {
+  fields: Fields;
+  base: number;
+  taskVersion: number;
+};
+const boundedText = (value: unknown, limit: number): value is string =>
+  typeof value === "string" && value.length <= limit;
+function validWorkDraft(value: unknown): value is WorkDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as WorkDraft;
+  const fields = draft.fields;
+  return !!fields && typeof fields === "object" &&
+    boundedText(fields.doneNote, 2000) &&
+    boundedText(fields.nextStep, 1000) &&
+    boundedText(fields.blocker, 1000) &&
+    (fields.evidence === null ||
+      (typeof fields.evidence === "object" &&
+        boundedText(fields.evidence.sourceId, 200) &&
+        boundedText(fields.evidence.versionId, 200))) &&
+    Number.isSafeInteger(draft.base) && draft.base >= 0 &&
+    Number.isSafeInteger(draft.taskVersion) && draft.taskVersion >= 1;
+}
 const latest = (task: Task) => task.checkpoints?.at(-1);
 const formatTime = (value: string) =>
   new Intl.DateTimeFormat("zh-CN", {
@@ -46,16 +69,29 @@ export default function TaskWorkDialog({
 }) {
   const task = project.tasks.find((item) => item.id === taskId)!;
   const saved = latest(task);
-  const [fields, setFields] = useState<Fields>(() => ({
-    doneNote: saved?.doneNote ?? "",
-    nextStep: saved?.nextStep ?? "",
-    blocker: saved?.blocker ?? "",
-    evidence: saved?.evidence ?? null,
-  }));
-  const [base, setBase] = useState(saved?.number ?? 0);
+  const taskVersion = task.revisions?.at(-1)?.number ?? 1;
+  const workDraft = useSessionDraft<WorkDraft>(
+    `checkpoint:${project.id}:${taskId}`,
+    () => ({
+      fields: {
+        doneNote: saved?.doneNote ?? "",
+        nextStep: saved?.nextStep ?? "",
+        blocker: saved?.blocker ?? "",
+        evidence: saved?.evidence ?? null,
+      },
+      base: saved?.number ?? 0,
+      taskVersion,
+    }),
+    validWorkDraft,
+  );
+  const { fields } = workDraft.value;
+  const [base, setBase] = useState(workDraft.value.base);
+  const [checkedTaskVersion, setCheckedTaskVersion] = useState(workDraft.value.taskVersion);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState(false);
+  const [restoring, setRestoring] = useState(workDraft.restored);
+  const [checkedLatest, setCheckedLatest] = useState(!workDraft.restored);
   const dialog = useRef<HTMLDialogElement>(null);
   const pending = useRef<Command | null>(null);
   const selectedSource = project.sources.find(
@@ -78,8 +114,39 @@ export default function TaskWorkDialog({
     };
   }, []);
 
+  useEffect(() => {
+    if (!workDraft.restored) return;
+    let active = true;
+    // Keep the original base until the latest checkpoint has actually been read.
+    // A restored input is never permission to overwrite a newer checkpoint.
+    getWorkspace().then((state) => {
+      if (!active) return;
+      const current = state.projects.find((item) => item.id === project.id)
+        ?.tasks.find((item) => item.id === taskId);
+      if (!current) throw new Error("任务已不可访问，请关闭窗口后刷新项目。");
+      onWorkspace(state);
+      const changed = base !== (latest(current)?.number ?? 0) ||
+        workDraft.value.taskVersion !== (current.revisions?.at(-1)?.number ?? 1);
+      setConflict(changed);
+      setCheckedLatest(!changed);
+    }).catch((err) => {
+      if (!active) return;
+      setConflict(true);
+      setCheckedLatest(false);
+      setError(err instanceof Error ? err.message : "暂时无法核对最新进度，请刷新后重试。");
+    }).finally(() => {
+      if (active) setRestoring(false);
+    });
+    return () => { active = false; };
+    // Each project/task mounts a fresh dialog; edits must not restart this check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function edit(change: Partial<Fields>) {
-    setFields((previous) => ({ ...previous, ...change }));
+    workDraft.setValue((previous) => ({
+      ...previous,
+      fields: { ...previous.fields, ...change },
+    }));
     pending.current = null;
   }
   async function refresh() {
@@ -93,7 +160,9 @@ export default function TaskWorkDialog({
       if (!current) throw new Error("任务已不可访问，请关闭窗口后刷新项目。");
       onWorkspace(state);
       setBase(latest(current)?.number ?? 0);
+      setCheckedTaskVersion(current.revisions?.at(-1)?.number ?? 1);
       // Require a separate acknowledgement after displaying the actual latest checkpoint.
+      setCheckedLatest(true);
       setConflict(true);
     } catch (err) {
       setError(
@@ -105,7 +174,7 @@ export default function TaskWorkDialog({
   }
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (busy || conflict) return;
+    if (busy || restoring || conflict) return;
     const payload = {
       projectId: project.id,
       taskId,
@@ -124,12 +193,14 @@ export default function TaskWorkDialog({
       const response = await submitCommand(command);
       onWorkspace(response.state);
       pending.current = null;
+      workDraft.clear();
       onNotice("继续点已保存。下次打开可接着做，任务进度和复核提醒保持不变。");
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         pending.current = null;
         setConflict(true);
+        setCheckedLatest(false);
         let message = `${err.message} 你的填写已保留。`;
         try {
           const state = await getWorkspace();
@@ -197,6 +268,11 @@ export default function TaskWorkDialog({
           </button>
         </div>
         <div className="modal-body">
+          {workDraft.restored && (
+            <p className="work-warning" role="status">
+              已恢复本窗口暂存的继续点填写，尚未保存。请核对任务和资料版本后再提交。
+            </p>
+          )}
           <div className="work-context">
             <h3>{task.title}</h3>
             <p>
@@ -243,9 +319,15 @@ export default function TaskWorkDialog({
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={busy || base !== (saved?.number ?? 0)}
+                  disabled={busy || !checkedLatest || base !== (saved?.number ?? 0) ||
+                    checkedTaskVersion !== taskVersion}
                   onClick={() => {
                     pending.current = null;
+                    workDraft.setValue((previous) => ({
+                      ...previous,
+                      base,
+                      taskVersion: checkedTaskVersion,
+                    }));
                     setConflict(false);
                     setError("");
                   }}
@@ -400,7 +482,7 @@ export default function TaskWorkDialog({
           <button
             type="submit"
             className="button primary"
-            disabled={busy || conflict || !fields.nextStep.trim()}
+            disabled={busy || restoring || conflict || !fields.nextStep.trim()}
           >
             {busy ? (
               <LoaderCircle size={16} className="spin" />

@@ -62,6 +62,7 @@ import TextDiff from "./TextDiff";
 import ReviewQueue from "./ReviewQueue";
 import CloudAnalysisPanel from "./CloudAnalysisPanel";
 import type { EvidenceTarget } from "./evidence-types";
+import { readSessionDraft, writeSessionDraft, clearSessionDraft } from "./session-drafts";
 
 type Page = "overview" | "materials" | "analysis" | "actions" | "artifacts";
 const navigationKey = "xingjian.navigation.v1";
@@ -102,6 +103,26 @@ const emptyFields = (): Fields => ({
   locator: "",
   claimIds: [],
 });
+interface ModalDraft {
+  fields: Fields;
+  basisRevision: number;
+}
+function validModalDraft(value: unknown): value is ModalDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as ModalDraft;
+  const fields = draft.fields;
+  return Number.isSafeInteger(draft.basisRevision) && draft.basisRevision >= 0 &&
+    !!fields && typeof fields === "object" &&
+    typeof fields.title === "string" && fields.title.length <= 120 &&
+    typeof fields.content === "string" && fields.content.length <= 100000 &&
+    typeof fields.goal === "string" && fields.goal.length <= 2000 &&
+    typeof fields.deadline === "string" && /^(|\d{4}-\d{2}-\d{2})$/.test(fields.deadline) &&
+    ["note", "table", "document"].includes(fields.kind) &&
+    typeof fields.sourceId === "string" && fields.sourceId.length <= 200 &&
+    typeof fields.locator === "string" && fields.locator.length <= 240 &&
+    Array.isArray(fields.claimIds) && fields.claimIds.length <= 1000 &&
+    fields.claimIds.every((id) => typeof id === "string" && id.length <= 200);
+}
 const nav = [
   { id: "overview" as const, label: "项目首页", icon: LayoutDashboard },
   { id: "materials" as const, label: "资料与依据", icon: BookOpen },
@@ -193,6 +214,10 @@ export default function App() {
     null,
   );
   const [fields, setFields] = useState<Fields>(emptyFields);
+  const fieldsRef = useRef(fields);
+  const modalDraft = useRef<{ key: string; basisRevision: number } | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftNeedsReview, setDraftNeedsReview] = useState(false);
   const [formError, setFormError] = useState("");
   const [preview, setPreview] = useState<ImpactPreview | null>(null);
   const [previewRevision, setPreviewRevision] = useState<number | null>(null);
@@ -264,11 +289,20 @@ export default function App() {
   function openModal(next: Modal, preset: Partial<Fields> = {}) {
     previousFocus.current = document.activeElement as HTMLElement;
     pendingCommand.current = null;
-    setFields({
+    const initial = {
       ...emptyFields(),
       sourceId: project?.sources[0]?.id ?? "",
       ...preset,
-    });
+    };
+    const context = next === "update" ? preset.sourceId ?? "" :
+      next === "task" ? [...(preset.claimIds ?? [])].sort().join(",") : "";
+    const key = `modal:${next === "project" ? "new" : project?.id}:${next}:${context}`;
+    const saved = readSessionDraft(key, validModalDraft);
+    fieldsRef.current = saved?.fields ?? initial;
+    setFields(fieldsRef.current);
+    modalDraft.current = { key, basisRevision: saved?.basisRevision ?? workspace?.revision ?? 0 };
+    setDraftRestored(saved !== null);
+    setDraftNeedsReview(!!saved && saved.basisRevision !== workspace?.revision);
     setPreview(null);
     setPreviewRevision(null);
     setFormError("");
@@ -281,7 +315,12 @@ export default function App() {
     }
   }
   function updateField<K extends keyof Fields>(key: K, value: Fields[K]) {
-    setFields((previous) => ({ ...previous, [key]: value }));
+    fieldsRef.current = { ...fieldsRef.current, [key]: value };
+    setFields(fieldsRef.current);
+    if (modalDraft.current) writeSessionDraft(modalDraft.current.key, {
+      fields: fieldsRef.current,
+      basisRevision: modalDraft.current.basisRevision,
+    });
     setPreview(null);
     setPreviewRevision(null);
     setFormError("");
@@ -331,7 +370,11 @@ export default function App() {
       setWorkspace(response.state);
       setProjectId(response.result.projectId);
       pendingCommand.current = null;
-      if (dismiss) setModal(null);
+      if (dismiss) {
+        if (modal && modalDraft.current) clearSessionDraft(modalDraft.current.key);
+        setModal(null);
+        setDraftRestored(false);
+      }
       setNotice(success);
       if (type === "create_project" || type === "load_demo") {
         setPage("overview");
@@ -367,7 +410,7 @@ export default function App() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!workspace || busy) return;
+    if (!workspace || busy || draftNeedsReview) return;
     if (modal === "project")
       return mutate(
         "create_project",
@@ -1689,6 +1732,30 @@ export default function App() {
               </button>
             </div>
             <div className="modal-body">
+              {draftRestored && (
+                <p className="modal-intro" role="status">
+                  已恢复本窗口的临时填写。尚未保存；资料变更仍需重新预览。
+                </p>
+              )}
+              {draftNeedsReview && (
+                <div className="info-strip">
+                  <span>工作区在关闭表单后有过更新，请核对当前资料与关联内容，再继续保存。</span>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy}
+                    onClick={() => {
+                      setDraftNeedsReview(false);
+                      if (modalDraft.current && workspace) {
+                        modalDraft.current.basisRevision = workspace.revision;
+                        writeSessionDraft(modalDraft.current.key, {
+                          fields: fieldsRef.current, basisRevision: workspace.revision,
+                        });
+                      }
+                    }}
+                  >已核对当前内容，保留填写</button>
+                </div>
+              )}
               <fieldset className="form-fields" disabled={busy}>
                 {modal === "project" && (
                   <>
@@ -1991,7 +2058,7 @@ export default function App() {
                 type="submit"
                 className="button primary"
                 disabled={
-                  busy ||
+                  busy || draftNeedsReview ||
                   (modal === "update" && !!preview && !preview.hasChanges) ||
                   (modal === "claim" && !project?.sources.length)
                 }

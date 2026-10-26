@@ -1,4 +1,11 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -21,6 +28,7 @@ import type {
   Workspace,
 } from "../shared/contracts";
 import { ApiError, getWorkspace, makeCommand, submitCommand } from "./api";
+import { useSessionDraft } from "./session-drafts";
 import {
   downloadReport,
   getReportPdfStatus,
@@ -28,6 +36,20 @@ import {
   startReportPdf,
   type ReportFormat,
 } from "./report-api";
+
+function validReportDraft(value: unknown): value is ReportRequest {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as ReportRequest;
+  return (
+    typeof draft.title === "string" && draft.title.length <= 120 &&
+    typeof draft.includeTasks === "boolean" &&
+    Array.isArray(draft.artifactIds) && draft.artifactIds.length <= 8 &&
+    new Set(draft.artifactIds).size === draft.artifactIds.length &&
+    draft.artifactIds.every(
+      (id) => typeof id === "string" && id.length > 0 && id.length <= 200,
+    )
+  );
+}
 
 type EvidenceOpener = (
   sourceId: string,
@@ -523,11 +545,29 @@ export default function ReportPanel({
   onEvidence: EvidenceOpener;
 }) {
   const prefix = useId();
-  const [title, setTitle] = useState(() =>
-    `${project.title} · 研学进展报告`.slice(0, 120),
+  const draft = useSessionDraft<ReportRequest>(
+    `report:${project.id}`,
+    () => ({
+      title: `${project.title} · 研学进展报告`.slice(0, 120),
+      artifactIds: [],
+      includeTasks: true,
+    }),
+    validReportDraft,
   );
-  const [artifactIds, setArtifactIds] = useState<string[]>([]);
-  const [includeTasks, setIncludeTasks] = useState(true);
+  const { title, artifactIds, includeTasks } = draft.value;
+  function setField<K extends keyof ReportRequest>(
+    key: K,
+    value: SetStateAction<ReportRequest[K]>,
+  ) {
+    draft.setValue((previous) => ({
+      ...previous,
+      [key]: typeof value === "function" ? value(previous[key]) : value,
+    }));
+  }
+  const setTitle = (value: string) => setField("title", value);
+  const setArtifactIds = (value: SetStateAction<string[]>) =>
+    setField("artifactIds", value);
+  const setIncludeTasks = (value: boolean) => setField("includeTasks", value);
   const [preview, setPreview] = useState<ReportPreview | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [stale, setStale] = useState(false);
@@ -616,6 +656,7 @@ export default function ReportPanel({
     try {
       const response = await submitCommand(command);
       pending.current = null;
+      draft.clear();
       onWorkspace(response.state);
       setPreview(null);
       setAcknowledged(false);
@@ -659,6 +700,11 @@ export default function ReportPanel({
         </div>
       </header>
       <div className="report-body">
+        {draft.restored && (
+          <p className="report-help session-draft-notice" role="status">
+            已恢复本项目尚未保存的报告填写和章节顺序，请重新预览并核对后再保存。
+          </p>
+        )}
         <ol className="report-steps" aria-label="报告整理步骤">
           <li>
             <span>1</span> 选择章节

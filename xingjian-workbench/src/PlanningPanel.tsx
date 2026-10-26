@@ -1,4 +1,10 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -26,6 +32,45 @@ import {
   previewPlan,
   submitCommand,
 } from "./api";
+import { useSessionDraft } from "./session-drafts";
+
+type PlanDraft = Omit<PlanRequest, "allowDuringClass">;
+interface SlotDraft {
+  title: string;
+  kind: "class" | "busy";
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+const draftDate = (value: unknown) =>
+  typeof value === "string" &&
+  (value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value));
+const draftTime = (value: unknown) =>
+  typeof value === "string" &&
+  (value === "" || /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value));
+function validPlanDraft(value: unknown): value is PlanDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as PlanDraft;
+  return (
+    draftDate(draft.date) && draftTime(draft.startTime) && draftTime(draft.endTime) &&
+    Array.isArray(draft.items) && draft.items.length <= 12 &&
+    draft.items.every((item) =>
+      item && typeof item.taskId === "string" &&
+      item.taskId.length > 0 && item.taskId.length <= 200 &&
+      Number.isFinite(item.durationMinutes) && Math.abs(item.durationMinutes) <= 10000,
+    ) &&
+    new Set(draft.items.map((item) => item.taskId)).size === draft.items.length
+  );
+}
+function validSlotDraft(value: unknown): value is SlotDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as SlotDraft;
+  return (
+    typeof draft.title === "string" && draft.title.length <= 120 &&
+    (draft.kind === "class" || draft.kind === "busy") && draftDate(draft.date) &&
+    draftTime(draft.startTime) && draftTime(draft.endTime)
+  );
+}
 
 const shanghaiDate = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -100,21 +145,54 @@ export default function PlanningPanel({
   onNotice: (message: string) => void;
 }) {
   const prefix = useId();
-  const [date, setDate] = useState(shanghaiDate);
-  const [startTime, setStartTime] = useState("19:00");
-  const [endTime, setEndTime] = useState("21:00");
-  const [items, setItems] = useState<PlanRequest["items"]>([]);
+  const draft = useSessionDraft<PlanDraft>(
+    `planning:${project.id}`,
+    () => ({
+      date: shanghaiDate(), startTime: "19:00", endTime: "21:00", items: [],
+    }),
+    validPlanDraft,
+  );
+  const { date, startTime, endTime, items } = draft.value;
+  function setPlanField<K extends keyof PlanDraft>(
+    key: K,
+    value: SetStateAction<PlanDraft[K]>,
+  ) {
+    draft.setValue((previous) => ({
+      ...previous,
+      [key]: typeof value === "function" ? value(previous[key]) : value,
+    }));
+  }
+  const setDate = (value: string) => setPlanField("date", value);
+  const setStartTime = (value: string) => setPlanField("startTime", value);
+  const setEndTime = (value: string) => setPlanField("endTime", value);
+  const setItems = (value: SetStateAction<PlanRequest["items"]>) =>
+    setPlanField("items", value);
   const [allowDuringClass, setAllowDuringClass] = useState(false);
   const [preview, setPreview] = useState<PlanPreview | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [stale, setStale] = useState(false);
   const [working, setWorking] = useState("");
   const [error, setError] = useState("");
-  const [slotTitle, setSlotTitle] = useState("");
-  const [slotKind, setSlotKind] = useState<"class" | "busy">("class");
-  const [slotDate, setSlotDate] = useState(shanghaiDate);
-  const [slotStart, setSlotStart] = useState("18:30");
-  const [slotEnd, setSlotEnd] = useState("20:00");
+  const slotDraft = useSessionDraft<SlotDraft>(
+    `planning-slot:${project.id}`,
+    () => ({
+      title: "", kind: "class", date: shanghaiDate(),
+      startTime: "18:30", endTime: "20:00",
+    }),
+    validSlotDraft,
+  );
+  const {
+    title: slotTitle, kind: slotKind, date: slotDate,
+    startTime: slotStart, endTime: slotEnd,
+  } = slotDraft.value;
+  function setSlotField<K extends keyof SlotDraft>(key: K, value: SlotDraft[K]) {
+    slotDraft.setValue((previous) => ({ ...previous, [key]: value }));
+  }
+  const setSlotTitle = (value: string) => setSlotField("title", value);
+  const setSlotKind = (value: SlotDraft["kind"]) => setSlotField("kind", value);
+  const setSlotDate = (value: string) => setSlotField("date", value);
+  const setSlotStart = (value: string) => setSlotField("startTime", value);
+  const setSlotEnd = (value: string) => setSlotField("endTime", value);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const pending = useRef<Command | null>(null);
   const previewHead = useRef<HTMLHeadingElement>(null);
@@ -194,6 +272,7 @@ export default function PlanningPanel({
     try {
       const response = await submitCommand(command);
       pending.current = null;
+      if (type === "confirm_plan") draft.clear();
       onWorkspace(response.state);
       setPreview(null);
       setAcknowledged(false);
@@ -372,6 +451,11 @@ export default function PlanningPanel({
         </span>
       </header>
       <div className="planning-body">
+        {(draft.restored || slotDraft.restored) && (
+          <p className="planning-help session-draft-notice" role="status">
+            已恢复本项目尚未保存的时间填写；请重新预览安排。课内安排许可和重叠确认需重新选择。
+          </p>
+        )}
         {error && (
           <div
             className="planning-error"
@@ -407,7 +491,9 @@ export default function PlanningPanel({
                 },
                 "add-slot",
                 "时间占用已保存，下次预览会按最新时间避让。",
-                () => setSlotTitle(""),
+                () => {
+                  slotDraft.clear({ ...slotDraft.value, title: "" });
+                },
               );
             }}
           >

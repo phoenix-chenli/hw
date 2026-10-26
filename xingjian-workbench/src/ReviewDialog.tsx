@@ -26,6 +26,7 @@ import {
 } from "./api";
 import TextDiff from "./TextDiff";
 import type { EvidenceTarget } from "./evidence-types";
+import { useSessionDraft } from "./session-drafts";
 
 export type ReviewTarget = {
   kind: "claim" | "task" | "artifact";
@@ -38,6 +39,27 @@ type Snapshot = {
   content?: string;
   claimIds?: string[];
 };
+type ReviewDraft = { snapshot: Snapshot; reason: string; hasDraft: boolean };
+const boundedText = (value: unknown, limit: number): value is string =>
+  typeof value === "string" && value.length <= limit;
+function validReviewDraft(value: unknown): value is ReviewDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as ReviewDraft;
+  const snapshot = draft.snapshot;
+  if (!snapshot || typeof snapshot !== "object" || draft.hasDraft !== true ||
+      !boundedText(draft.reason, 1000)) return false;
+  return (snapshot.text === undefined || boundedText(snapshot.text, 4000)) &&
+    (snapshot.title === undefined || boundedText(snapshot.title, 120)) &&
+    (snapshot.content === undefined || boundedText(snapshot.content, 100000)) &&
+    (snapshot.claimIds === undefined ||
+      (Array.isArray(snapshot.claimIds) && snapshot.claimIds.length <= 100 &&
+        snapshot.claimIds.every((id) => boundedText(id, 200)))) &&
+    (snapshot.evidence === undefined ||
+      (Array.isArray(snapshot.evidence) && snapshot.evidence.length <= 100 &&
+        snapshot.evidence.every((ref) => !!ref && typeof ref === "object" &&
+          boundedText(ref.sourceId, 200) && boundedText(ref.versionId, 200) &&
+          boundedText(ref.locator, 240))));
+}
 type Revision = Snapshot & {
   number: number;
   recordedAt: string;
@@ -91,16 +113,21 @@ export default function ReviewDialog({
 }) {
   const entity = getEntity(project, target);
   const reviewable = needsReview(entity);
+  const reviewDraft = useSessionDraft<ReviewDraft>(
+    `review:${project.id}:${target.kind}:${target.entityId}`,
+    () => ({ snapshot: {}, reason: "", hasDraft: false }),
+    validReviewDraft,
+  );
   const [preview, setPreview] = useState<ReviewPreview | null>(null);
-  const [draft, setDraft] = useState<Snapshot>({});
-  const [reason, setReason] = useState("");
+  const [draft, setDraft] = useState<Snapshot>(reviewDraft.value.snapshot);
+  const [reason, setReason] = useState(reviewDraft.value.reason);
   const [acknowledged, setAcknowledged] = useState(false);
   const [loading, setLoading] = useState(reviewable);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [mustRefresh, setMustRefresh] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [hasDraft, setHasDraft] = useState(false);
+  const [hasDraft, setHasDraft] = useState(reviewDraft.value.hasDraft);
   const dialog = useRef<HTMLDialogElement>(null);
   const pending = useRef<Command | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -159,7 +186,9 @@ export default function ReviewDialog({
   }, [attempt, project.id, target.kind, target.entityId]);
 
   function edit(values: Partial<Snapshot>) {
-    setDraft((previous) => ({ ...previous, ...values }));
+    const next = { ...draft, ...values };
+    setDraft(next);
+    reviewDraft.setValue({ snapshot: next, reason, hasDraft: true });
     setAcknowledged(false);
     pending.current = null;
   }
@@ -196,6 +225,7 @@ export default function ReviewDialog({
       const response = await submitCommand(command);
       onWorkspace(response.state);
       pending.current = null;
+      reviewDraft.clear();
       onComplete(
         `${kindLabel[target.kind]}已人工复核，旧内容与依据已保留。${target.kind === "claim" ? "关联行动和草稿仍需分别确认。" : target.kind === "task" ? "任务进度保持不变。" : "已保存新的草稿内容版本。"}`,
       );
@@ -255,6 +285,11 @@ export default function ReviewDialog({
           </button>
         </div>
         <div className="modal-body review-body">
+          {reviewDraft.restored && reviewable && (
+            <p className="review-message" role="status">
+              已恢复本窗口暂存的复核填写，尚未保存。请核对重新读取的当前依据，再勾选确认。
+            </p>
+          )}
           {loading && (
             <p className="review-loading" role="status">
               <LoaderCircle className="spin" size={18} />
@@ -531,6 +566,11 @@ export default function ReviewDialog({
                     value={reason}
                     onChange={(event) => {
                       setReason(event.target.value);
+                      reviewDraft.setValue({
+                        snapshot: draft,
+                        reason: event.target.value,
+                        hasDraft: true,
+                      });
                       setAcknowledged(false);
                       pending.current = null;
                     }}
