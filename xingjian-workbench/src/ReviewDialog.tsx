@@ -194,7 +194,7 @@ export default function ReviewDialog({
   }
   async function confirm(event: FormEvent) {
     event.preventDefault();
-    if (!preview || busy || loading || mustRefresh || !acknowledged) return;
+    if (!preview || busy || loading || mustRefresh || !acknowledged || project.archivedAt) return;
     setBusy(true);
     setError("");
     const payload = {
@@ -251,7 +251,7 @@ export default function ReviewDialog({
     }
   }
   const blocked = !!preview?.blockedBy.length;
-  const disabled = busy || loading || mustRefresh || blocked || !reviewable;
+  const disabled = busy || loading || mustRefresh || blocked || !reviewable || !!project.archivedAt;
   const baseline: Snapshot | undefined = preview?.baseline;
 
   return (
@@ -285,6 +285,7 @@ export default function ReviewDialog({
           </button>
         </div>
         <div className="modal-body review-body">
+          {project.archivedAt && <p className="review-message" role="alert">项目已归档，复核填写仍保留。请关闭窗口，恢复原项目后再确认。</p>}
           {reviewDraft.restored && reviewable && (
             <p className="review-message" role="status">
               已恢复本窗口暂存的复核填写，尚未保存。请核对重新读取的当前依据，再勾选确认。

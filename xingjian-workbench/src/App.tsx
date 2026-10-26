@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   ArrowRight,
+  Archive,
   BookOpen,
   Check,
   CheckCircle2,
@@ -82,7 +83,7 @@ function savedNavigation(): { projectId: string; page: Page } {
   }
   return { projectId: "", page: "overview" };
 }
-type Modal = "project" | "source" | "claim" | "task" | "artifact" | "update";
+type Modal = "project" | "project_edit" | "archive" | "source" | "claim" | "task" | "artifact" | "update";
 interface Fields {
   title: string;
   content: string;
@@ -208,6 +209,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modal, setModal] = useState<Modal | null>(null);
+  const [projectDialogId, setProjectDialogId] = useState("");
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const archivedHeading = useRef<HTMLDetailsElement>(null);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [workTaskId, setWorkTaskId] = useState<string | null>(null);
   const [evidenceTarget, setEvidenceTarget] = useState<EvidenceTarget | null>(
@@ -228,9 +232,21 @@ export default function App() {
   const pendingCommand = useRef<Command | null>(null);
   const reviewQueueHeading = useRef<HTMLHeadingElement>(null);
   const returnToQueue = useRef(false);
-  const project =
-    workspace?.projects.find((item) => item.id === projectId) ??
-    workspace?.projects[0];
+  const activeProjects = workspace?.projects.filter((item) => !item.archivedAt) ?? [];
+  const archivedProjects = workspace?.projects.filter((item) => !!item.archivedAt) ?? [];
+  const project = activeProjects.find((item) => item.id === projectId) ?? activeProjects[0];
+  const projectDialog = workspace?.projects.find((item) => item.id === projectDialogId);
+  const reviewProject = reviewTarget && workspace?.projects.find((item) =>
+    (reviewTarget.kind === "claim" ? item.claims : reviewTarget.kind === "task" ? item.tasks : item.artifacts)
+      .some((entity) => entity.id === reviewTarget.entityId));
+  const workProject = workTaskId && workspace?.projects.find((item) =>
+    item.tasks.some((task) => task.id === workTaskId));
+  const evidenceProject = evidenceTarget && workspace?.projects.find((item) =>
+    item.sources.some((source) => source.id === evidenceTarget.sourceId));
+  const archiveBusy = projectDialog?.agentRuns?.some((run) =>
+    run.status === "queued" || run.status === "running");
+  const projectUnchanged = !!projectDialog && fields.title.trim() === projectDialog.title &&
+    fields.goal.trim() === projectDialog.goal && (fields.deadline || null) === projectDialog.deadline;
   const source =
     project?.sources.find((item) => item.id === selectedSourceId) ??
     project?.sources[0];
@@ -275,11 +291,9 @@ export default function App() {
   useEffect(() => {
     if (!modal) return;
     dialogRef.current?.showModal();
-    dialogRef.current
-      ?.querySelector<HTMLElement>(
+    (dialogRef.current?.querySelector<HTMLElement>(
         "input:not([disabled]), textarea:not([disabled]), select:not([disabled])",
-      )
-      ?.focus();
+      ) ?? dialogRef.current?.querySelector<HTMLElement>("h2"))?.focus();
     return () => {
       dialogRef.current?.close();
       previousFocus.current?.focus();
@@ -292,8 +306,12 @@ export default function App() {
     const initial = {
       ...emptyFields(),
       sourceId: project?.sources[0]?.id ?? "",
+      ...(next === "project_edit" && project ? {
+        title: project.title, goal: project.goal, deadline: project.deadline ?? "",
+      } : {}),
       ...preset,
     };
+    setProjectDialogId(project?.id ?? "");
     const context = next === "update" ? preset.sourceId ?? "" :
       next === "task" ? [...(preset.claimIds ?? [])].sort().join(",") : "";
     const key = `modal:${next === "project" ? "new" : project?.id}:${next}:${context}`;
@@ -381,6 +399,21 @@ export default function App() {
         setSelectedSourceId("");
         setSelectedVersionId("");
       }
+      if (type === "archive_project" || type === "restore_project") {
+        setPage("overview");
+        setSelectedSourceId("");
+        setSelectedVersionId("");
+        setReviewTarget(null);
+        setWorkTaskId(null);
+        setEvidenceTarget(null);
+        setSidebarOpen(false);
+        if (type === "archive_project") {
+          setArchivedOpen(true);
+          requestAnimationFrame(() => document.getElementById("main-content")?.focus());
+        } else {
+          requestAnimationFrame(() => document.querySelector<HTMLElement>(".page-heading h1")?.focus());
+        }
+      }
       if (type === "add_source") {
         setSelectedSourceId(response.result.entityId ?? "");
         setSelectedVersionId("");
@@ -393,9 +426,18 @@ export default function App() {
         setPreview(null);
         setPreviewRevision(null);
         try {
-          setWorkspace(await getWorkspace());
+          const latestState = await getWorkspace();
+          setWorkspace(latestState);
           message =
             "资料状态已更新。你的输入已保留，请核对最新内容后重新提交；资料变更需要重新预览。";
+          if (latestState.projects.find((item) => item.id === payload.projectId)?.archivedAt)
+            message = "项目已归档，填写已保留。请关闭窗口，从已归档项目恢复后再保存。";
+          if (modal === "project_edit" || modal === "archive") {
+            if (error.code === "REVISION_CONFLICT") {
+              setDraftNeedsReview(true);
+              message = "项目状态已更新。填写已保留，请核对当前保存内容后再提交。";
+            } else message = error.message;
+          }
         } catch {
           message =
             "状态发生冲突，且暂时无法刷新。输入已保留，请恢复本地服务后重试。";
@@ -421,7 +463,25 @@ export default function App() {
         },
         "项目已建立，从添加第一份资料开始。",
       );
-    if (!project) return;
+    if (modal === "project_edit" || modal === "archive") {
+      if (!projectDialog || projectDialog.archivedAt) {
+        setFormError("这个项目已归档或无法访问，请关闭窗口，从已归档项目中恢复后再操作。");
+        return;
+      }
+      if (modal === "archive") return mutate(
+        "archive_project", { projectId: projectDialog.id },
+        "项目已归档。资料、报告和原有时间安排均已保留，可从已归档项目中恢复。",
+      );
+      return mutate("update_project", {
+        projectId: projectDialog.id,
+        title: fields.title.trim(), goal: fields.goal.trim(), deadline: fields.deadline || null,
+      }, "项目信息已更新。已有资料、行动、时间安排和报告历史均已保留。");
+    }
+    const project = workspace.projects.find((item) => item.id === projectDialogId);
+    if (!project || project.archivedAt) {
+      setFormError("项目已归档或无法访问，填写已保留。请关闭窗口，恢复原项目后再保存。");
+      return;
+    }
     const projectPayload = { projectId: project.id };
     if (modal === "source")
       return mutate(
@@ -587,6 +647,7 @@ export default function App() {
     );
   }
   function claimPicker() {
+    const project = projectDialog;
     return (
       <fieldset className="claim-picker">
         <legend>关联结论</legend>
@@ -794,12 +855,13 @@ export default function App() {
           </button>
         </div>
         <div className="project-list">
-          {workspace?.projects.map((item) => (
+          {activeProjects.map((item) => (
             <button
               type="button"
               key={item.id}
               className={`project-switch ${item.id === project?.id ? "active" : ""}`}
               onClick={() => selectProject(item.id)}
+              disabled={busy}
             >
               <FolderOpen size={17} />
               <span>{item.title}</span>
@@ -810,14 +872,42 @@ export default function App() {
               )}
             </button>
           ))}
-          {workspace?.projects.length === 0 && (
+          {workspace && activeProjects.length === 0 && (
             <p className="empty-projects">
-              还没有项目
+              {archivedProjects.length ? "当前没有进行中的项目" : "还没有项目"}
               <br />
               从一个清楚的目标开始
             </p>
           )}
         </div>
+        {archivedProjects.length > 0 && (
+          <details
+            className="archived-projects"
+            ref={archivedHeading}
+            open={archivedOpen}
+            onToggle={(event) => setArchivedOpen(event.currentTarget.open)}
+          >
+            <summary>已归档项目（{archivedProjects.length}）</summary>
+            <div className="archived-project-list">
+              {archivedProjects.map((item) => (
+                <div key={item.id} className="archived-project">
+                  <strong>{item.title}</strong>
+                  <span>归档于 {formatDate(item.archivedAt!)}</span>
+                  <button
+                    type="button"
+                    className="text-button"
+                    aria-label={`恢复项目：${item.title}`}
+                    disabled={busy}
+                    onClick={() => void mutate(
+                      "restore_project", { projectId: item.id },
+                      "项目已恢复，原有资料、任务进度与报告历史均已保留。",
+                    )}
+                  >恢复项目</button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
         <div className="sidebar-divider" />
         <nav aria-label="项目导航">
           {nav.map((item) => (
@@ -931,15 +1021,11 @@ export default function App() {
           ) : !project ? (
             <section className="welcome">
               <span className="eyebrow">让每一步，都有所依据</span>
-              <h1>
-                从一个问题，
-                <br />
-                走向一份扎实的成果。
-              </h1>
+              <h1>{archivedProjects.length ? "当前没有进行中的项目" : <>从一个问题，<br />走向一份扎实的成果。</>}</h1>
               <p>
-                把研究资料、结论与行动放在一起。
-                <br />
-                资料更新后，知道哪些工作需要重新核对。
+                {archivedProjects.length
+                  ? "可以建立新项目，或从已归档项目中恢复。原有资料和报告仍在这台电脑上保留。"
+                  : <>把研究资料、结论与行动放在一起。<br />资料更新后，知道哪些工作需要重新核对。</>}
               </p>
               <div className="welcome-actions">
                 <button
@@ -948,8 +1034,15 @@ export default function App() {
                   onClick={() => openModal("project")}
                 >
                   <Plus size={18} />
-                  建立我的第一个项目
+                  {archivedProjects.length ? "建立新项目" : "建立我的第一个项目"}
                 </button>
+                {archivedProjects.length > 0 && (
+                  <button type="button" className="button secondary" onClick={() => {
+                    setArchivedOpen(true);
+                    setSidebarOpen(true);
+                    requestAnimationFrame(() => archivedHeading.current?.querySelector("summary")?.focus());
+                  }}>查看已归档项目</button>
+                )}
                 <button
                   type="button"
                   className="button secondary"
@@ -1002,7 +1095,7 @@ export default function App() {
                             ? "让发现变成具体的下一步"
                             : "保留思路，也保留它的依据"}
                   </span>
-                  <h1>{page === "overview" ? project.title : title}</h1>
+                  <h1 tabIndex={-1}>{page === "overview" ? project.title : title}</h1>
                   <p>
                     {page === "overview"
                       ? project.goal
@@ -1016,11 +1109,23 @@ export default function App() {
                   </p>
                 </div>
                 {page === "overview" ? (
-                  <div className="deadline">
-                    <Clock3 size={16} />
-                    {project.deadline
-                      ? `${formatDate(project.deadline)} 截止`
-                      : "暂未设置截止日期"}
+                  <div className="project-controls">
+                    <div className="deadline">
+                      <Clock3 size={16} />
+                      {project.deadline
+                        ? `${formatDate(project.deadline)} 截止`
+                        : "暂未设置截止日期"}
+                    </div>
+                    <div className="project-control-buttons">
+                      <button type="button" className="button secondary" disabled={busy}
+                        onClick={() => openModal("project_edit")}>
+                        <Settings2 size={16} />编辑项目
+                      </button>
+                      <button type="button" className="text-button" disabled={busy}
+                        onClick={() => openModal("archive")}>
+                        <Archive size={16} />归档项目
+                      </button>
+                    </div>
                   </div>
                 ) : page === "analysis" ? (
                   <span className="badge badge-blue">
@@ -1645,10 +1750,10 @@ export default function App() {
           </footer>
         </main>
       </div>
-      {reviewTarget && project && workspace && (
+      {reviewTarget && reviewProject && workspace && (
         <ReviewDialog
           key={`${reviewTarget.kind}-${reviewTarget.entityId}`}
-          project={project}
+          project={reviewProject}
           workspace={workspace}
           target={reviewTarget}
           onClose={() => setReviewTarget(null)}
@@ -1662,10 +1767,10 @@ export default function App() {
           onEvidence={viewEvidence}
         />
       )}
-      {workTaskId && project && workspace && (
+      {workTaskId && workProject && workspace && (
         <TaskWorkDialog
           key={workTaskId}
-          project={project}
+          project={workProject}
           workspace={workspace}
           taskId={workTaskId}
           onClose={() => setWorkTaskId(null)}
@@ -1708,10 +1813,12 @@ export default function App() {
                     ? "先看影响，再确认保存"
                     : "把研究向前推进一步"}
                 </span>
-                <h2 id="modal-title">
+                <h2 id="modal-title" tabIndex={-1}>
                   {
                     {
                       project: "建立一个研究项目",
+                      project_edit: "编辑项目信息",
+                      archive: "归档这个项目？",
                       source: "添加研究资料",
                       claim: "记录结论与依据",
                       task: "添加一项行动",
@@ -1732,6 +1839,9 @@ export default function App() {
               </button>
             </div>
             <div className="modal-body">
+              {modal !== "project" && projectDialog?.archivedAt && (
+                <p className="form-error" role="alert">项目已归档，填写仍保留在原项目。请关闭窗口，从已归档项目恢复后再保存。</p>
+              )}
               {draftRestored && (
                 <p className="modal-intro" role="status">
                   已恢复本窗口的临时填写。尚未保存；资料变更仍需重新预览。
@@ -1756,8 +1866,21 @@ export default function App() {
                   >已核对当前内容，保留填写</button>
                 </div>
               )}
-              <fieldset className="form-fields" disabled={busy}>
-                {modal === "project" && (
+              <fieldset className="form-fields" disabled={busy || (modal !== "project" && !!projectDialog?.archivedAt)}>
+                {modal === "project_edit" && projectDialog && (
+                  <>
+                    <p className="modal-intro">保存后更新项目信息；已有时间安排和报告历史保留，不会自动改期或改写旧报告。</p>
+                    <details className="project-saved-info" open={draftNeedsReview}>
+                      <summary>当前保存的项目信息</summary>
+                      <dl>
+                        <dt>项目名称</dt><dd>{projectDialog.title}</dd>
+                        <dt>研究目标</dt><dd>{projectDialog.goal}</dd>
+                        <dt>截止日期</dt><dd>{projectDialog.deadline ?? "暂未设置"}</dd>
+                      </dl>
+                    </details>
+                  </>
+                )}
+                {(modal === "project" || modal === "project_edit") && (
                   <>
                     <Field label="项目名称">
                       <input
@@ -1796,6 +1919,14 @@ export default function App() {
                       />
                     </Field>
                   </>
+                )}
+                {modal === "archive" && projectDialog && (
+                  <div className="archive-explanation">
+                    <h3>{projectDialog.title}</h3>
+                    <p>归档后，项目会从进行中的列表收起。资料、结论、行动、继续点与报告版本全部保留，可从“已归档项目”恢复。</p>
+                    <p>归档不会取消已确认的计划，原有时间占用仍参与冲突检查。恢复项目后可按需要调整安排。</p>
+                    {archiveBusy && <p className="warning-text" role="status">这个项目的云端分析尚未结束，请先在资料分析页处理运行，再归档项目。</p>}
+                  </div>
                 )}
                 {modal === "source" && (
                   <>
@@ -1874,7 +2005,7 @@ export default function App() {
                         <option value="" disabled>
                           请选择资料
                         </option>
-                        {project?.sources.map((item) => (
+                        {projectDialog?.sources.map((item) => (
                           <option value={item.id} key={item.id}>
                             {item.title} · v{currentVersion(item).number}
                           </option>
@@ -2059,8 +2190,11 @@ export default function App() {
                 className="button primary"
                 disabled={
                   busy || draftNeedsReview ||
+                  (modal !== "project" && (!projectDialog || !!projectDialog.archivedAt)) ||
+                  (modal === "project_edit" && projectUnchanged) ||
+                  (modal === "archive" && !!archiveBusy) ||
                   (modal === "update" && !!preview && !preview.hasChanges) ||
-                  (modal === "claim" && !project?.sources.length)
+                  (modal === "claim" && !projectDialog?.sources.length)
                 }
               >
                 {busy ? (
@@ -2078,16 +2212,20 @@ export default function App() {
                       : "预览变更影响"
                     : modal === "project"
                       ? "建立项目"
+                      : modal === "project_edit"
+                        ? "保存修改"
+                        : modal === "archive"
+                          ? "确认归档"
                       : "保存"}
               </button>
             </div>
           </form>
         </dialog>
       )}
-      {evidenceTarget && project && (
+      {evidenceTarget && evidenceProject && (
         <EvidenceDialog
-          key={`${project.id}-${JSON.stringify(evidenceTarget)}`}
-          project={project}
+          key={`${evidenceProject.id}-${JSON.stringify(evidenceTarget)}`}
+          project={evidenceProject}
           target={evidenceTarget}
           onClose={() => setEvidenceTarget(null)}
         />

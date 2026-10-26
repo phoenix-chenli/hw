@@ -107,29 +107,44 @@ function planWarning(
   if ((task.checkpoints?.at(-1)?.number ?? 0) !== block.checkpointNumber)
     return "继续点已更新，请核对是否仍需这段时间。";
   if (task.status === "done") return "行动已完成，可取消不再需要的安排。";
+  let legacyOverlapUnverified = false;
   const conflictingSlots = workspace.projects
     .filter((item) => item.ownerId === project.ownerId)
     .flatMap((item) =>
-      (item.busySlots ?? []).map((slot) => ({ ...slot, projectTitle: item.title })),
+      (item.busySlots ?? []).map((slot) => ({
+        ...slot, projectId: item.id, projectTitle: item.title,
+      })),
     )
     .filter(
       (slot) =>
         slot.active &&
         slot.date === plan.request.date &&
         slot.startTime < block.endTime &&
-        block.startTime < slot.endTime &&
-        (slot.kind === "busy" ||
-          !plan.request.allowDuringClass ||
-          !block.classConflicts.some(
-            (prior) =>
-              prior.title === slot.title &&
-              prior.projectTitle === slot.projectTitle &&
-              prior.startTime === slot.startTime &&
-              prior.endTime === slot.endTime,
-          )),
-    );
+        block.startTime < slot.endTime,
+    )
+    .filter((slot) => {
+      if (slot.kind === "busy" || !plan.request.allowDuringClass) return true;
+      const sameCourse = (prior: PlanBlock["classConflicts"][number]) =>
+        prior.title === slot.title && prior.startTime === slot.startTime &&
+        prior.endTime === slot.endTime;
+      const identified = block.classConflicts.find((prior) =>
+        prior.projectId === slot.projectId && prior.slotId === slot.id);
+      if (identified) return !sameCourse(identified);
+      const legacy = block.classConflicts.filter((prior) =>
+        prior.projectId === undefined && prior.slotId === undefined);
+      if (legacy.some((prior) =>
+        sameCourse(prior) && prior.projectTitle === slot.projectTitle)) return false;
+      if (legacy.length) {
+        // Old snapshots cannot prove which current slot the user acknowledged.
+        legacyOverlapUnverified = true;
+        return false;
+      }
+      return true;
+    });
   if (conflictingSlots.length)
     return `当前已录入时段与原安排冲突（${conflictingSlots.map((slot) => slot.title).join("、")}），请取消后重新预览。`;
+  if (legacyOverlapUnverified)
+    return "旧计划未记录完整课程标识，当前重叠需重新核对。原安排与历史提醒仍保留。";
   return "";
 }
 

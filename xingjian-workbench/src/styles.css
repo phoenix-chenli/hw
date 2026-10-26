@@ -125,6 +125,7 @@ select {
   flex-direction: column;
   padding: 31px 18px 22px;
   z-index: 20;
+  overflow-y: auto;
 }
 .brand {
   display: flex;
@@ -184,6 +185,30 @@ select {
 .project-list {
   max-height: 26vh;
   overflow-y: auto;
+}
+.archived-projects {
+  margin: 10px 0 0;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.archived-projects summary { cursor: pointer; padding: 7px 0; }
+.archived-project-list { max-height: 20vh; overflow-y: auto; }
+.archived-project { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 10px 0; border-top: 1px solid var(--border); }
+.archived-project strong { color: #32435b; overflow-wrap: anywhere; max-width: 100%; }
+.archived-project .text-button { font-size: 12px; }
+.project-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex-shrink: 0; }
+.project-control-buttons { display: flex; align-items: center; gap: 12px; }
+.project-control-buttons .text-button { display: inline-flex; gap: 6px; align-items: center; }
+.project-saved-info { color: var(--muted); font-size: 13px; }
+.project-saved-info summary { cursor: pointer; padding: 8px 0; }
+.project-saved-info dl { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px 12px; margin: 8px 0 0; }
+.project-saved-info dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #263850; }
+.archive-explanation { display: grid; gap: 14px; }
+@media (max-width: 980px) {
+  .page-heading:has(.project-controls) { flex-direction: column; align-items: stretch; }
+  .project-controls { align-items: flex-start; }
+  .project-controls .deadline { margin-top: 0; }
 }
 .project-switch {
   display: flex;

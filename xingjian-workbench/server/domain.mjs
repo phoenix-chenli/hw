@@ -45,6 +45,9 @@ const LIMITS = Object.freeze({
 });
 const COMMANDS = new Set([
   "create_project",
+  "update_project",
+  "archive_project",
+  "restore_project",
   "load_demo",
   "add_source",
   "add_claim",
@@ -194,6 +197,8 @@ export function validateWorkspace(state) {
       deadline(project.deadline);
       timestamp(project.createdAt, "创建时间");
       bool(project.isDemo, "示例标记");
+      if (project.archivedAt !== undefined && project.archivedAt !== null)
+        timestamp(project.archivedAt, "项目归档时间");
       const sourceMap = new Map();
       for (const source of array(project.sources, "资料")) {
         record(source, "资料");
@@ -587,8 +592,32 @@ export function applyCommand(state, ownerId, type, payload, options = {}) {
     next.projects.push(project);
   } else {
     project = ownedProject(next, owner, payload.projectId);
+    if (project.archivedAt && type === "archive_project")
+      fail("项目已经归档，无需重复归档。", "NO_CHANGES");
+    if (project.archivedAt && type !== "restore_project")
+      fail("项目已归档，请先恢复项目再修改。", "PROJECT_ARCHIVED", 409);
     const claimMap = new Map(project.claims.map((entry) => [entry.id, entry]));
-    if (type === "create_agent_run") {
+    if (type === "update_project") {
+      const title = string(payload.title, "项目标题", LIMITS.title);
+      const goal = string(payload.goal, "项目目标", LIMITS.goal);
+      const due = deadline(payload.deadline);
+      if (title === project.title && goal === project.goal && due === project.deadline)
+        fail("项目基本信息没有变化。", "NO_CHANGES");
+      project.title = title;
+      project.goal = goal;
+      project.deadline = due;
+      addActivity(project, "更新项目名称、研究目标或截止日期；已有资料、任务和报告版本保持不变。", ctx);
+    } else if (type === "archive_project") {
+      if (project.agentRuns?.some((run) => ["queued", "running"].includes(run.status)))
+        fail("项目仍有等待或运行中的云端分析，请先处理运行记录再归档。", "PROJECT_BUSY", 409);
+      project.archivedAt = ctx.now;
+      addActivity(project, "归档项目；保留资料、任务、成果和已有时间占用，可随时恢复。", ctx);
+    } else if (type === "restore_project") {
+      if (!project.archivedAt)
+        fail("项目未归档，无需恢复。", "NO_CHANGES");
+      project.archivedAt = null;
+      addActivity(project, "恢复已归档项目；资料、任务、成果和原有安排保持不变。", ctx);
+    } else if (type === "create_agent_run") {
       const provider = enumValue(payload.provider, ["agentarts", "contract-test"], "运行来源");
       if (payload.authorizeCloud !== true && payload.authorizeCloud !== false)
         fail("请明确本次是否授权发送资料。");

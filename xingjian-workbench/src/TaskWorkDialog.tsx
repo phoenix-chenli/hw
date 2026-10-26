@@ -174,7 +174,7 @@ export default function TaskWorkDialog({
   }
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (busy || restoring || conflict) return;
+    if (busy || restoring || conflict || project.archivedAt) return;
     const payload = {
       projectId: project.id,
       taskId,
@@ -268,6 +268,7 @@ export default function TaskWorkDialog({
           </button>
         </div>
         <div className="modal-body">
+          {project.archivedAt && <p className="work-warning" role="alert">项目已归档，临时填写仍保留。请关闭窗口，恢复原项目后再保存。</p>}
           {workDraft.restored && (
             <p className="work-warning" role="status">
               已恢复本窗口暂存的继续点填写，尚未保存。请核对任务和资料版本后再提交。
@@ -337,7 +338,7 @@ export default function TaskWorkDialog({
               </div>
             </section>
           )}
-          <fieldset className="form-fields" disabled={busy}>
+          <fieldset className="form-fields" disabled={busy || !!project.archivedAt}>
             <div className="field">
               <label htmlFor="work-done">这次做到哪里</label>
               <textarea
@@ -482,7 +483,7 @@ export default function TaskWorkDialog({
           <button
             type="submit"
             className="button primary"
-            disabled={busy || restoring || conflict || !fields.nextStep.trim()}
+            disabled={busy || restoring || conflict || !!project.archivedAt || !fields.nextStep.trim()}
           >
             {busy ? (
               <LoaderCircle size={16} className="spin" />

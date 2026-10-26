@@ -285,6 +285,8 @@ export function buildPlanPreview(state, project, input) {
             overlaps({ start, end }, range(slot.startTime, slot.endTime)),
         )
         .map((slot) => ({
+          projectId: slot.projectId,
+          slotId: slot.id,
           title: slot.title,
           projectTitle: slot.projectTitle,
           startTime: slot.startTime,
@@ -416,6 +418,10 @@ export function validatePlanningState(project, register) {
         fail("未允许课中安排的计划不能记录课程重叠。");
       for (const conflict of conflicts) {
         object(conflict, "课程重叠");
+        if ("projectId" in conflict || "slotId" in conflict) {
+          identifier(conflict.projectId, "课程所在项目 ID");
+          identifier(conflict.slotId, "课程占用 ID");
+        }
         text(conflict.title, "课程名称", 120);
         text(conflict.projectTitle, "课程所在项目", 120);
         if (!overlaps(period, range(conflict.startTime, conflict.endTime)))

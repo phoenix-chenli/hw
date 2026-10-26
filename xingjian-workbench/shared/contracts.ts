@@ -105,6 +105,8 @@ export interface Project {
   deadline: string | null;
   createdAt: string;
   isDemo: boolean;
+  /** Missing/null means active, for compatibility with existing workspaces. */
+  archivedAt?: string | null;
   sources: Source[];
   claims: Claim[];
   tasks: Task[];
@@ -140,6 +142,9 @@ export interface ImpactPreview {
 }
 export type CommandType =
   | "create_project"
+  | "update_project"
+  | "archive_project"
+  | "restore_project"
   | "load_demo"
   | "add_source"
   | "add_claim"
@@ -268,6 +273,9 @@ export interface PlanBlock {
   endTime: string;
   durationMinutes: number;
   classConflicts: {
+    /** Legacy snapshots may contain only names and times. */
+    projectId?: string;
+    slotId?: string;
     title: string;
     projectTitle: string;
     startTime: string;
