@@ -6,7 +6,11 @@ import {
   previewTableCatalog,
   previewReview,
   previewPlan,
+  previewReport,
+  savedReport,
 } from "./domain.mjs";
+import { reportToJats, reportToHtml } from "./report-render.mjs";
+import { PdfJobs } from "./pdf-jobs.mjs";
 
 const LOCAL_OWNER = "local-user";
 const MAX_BODY = 256 * 1024;
@@ -68,8 +72,9 @@ async function body(request) {
 
 export function createApp(
   store,
-  { staticDir, allowedPorts = [8787, 5173, 4173] } = {},
+  { staticDir, allowedPorts = [8787, 5173, 4173], pdfJobs } = {},
 ) {
+  const exports = pdfJobs ?? new PdfJobs(store.file + ".exports");
   const allowedAuthorities = new Set(
     allowedPorts.flatMap((port) => [`127.0.0.1:${port}`, `localhost:${port}`]),
   );
@@ -116,9 +121,10 @@ export function createApp(
         if (request.method === "GET" && url.pathname === "/api/capabilities")
           return json(response, 200, {
             mode: "local-single-user",
-            stage: 3,
+            stage: 4,
             agentArts: "not-connected",
-            reportExport: "not-connected",
+            reportExport: "fixed-template-local",
+            pdfEngine: "existing-browser-worker",
             sourceAnalysis: "local-keyword-and-csv",
             analysisProvider: "local-tools-v1",
             sourceReview: "individual-versioned-review",
@@ -128,6 +134,86 @@ export function createApp(
             storage: "local-file",
             account: "local-development-only",
           });
+        if (
+          request.method === "POST" &&
+          url.pathname.startsWith("/api/reports/")
+        ) {
+          const input = await body(request);
+          if (!input || typeof input !== "object" || Array.isArray(input))
+            throw fail("INVALID_REPORT", "报告参数错误。", 400);
+          if (url.pathname === "/api/reports/preview")
+            return json(
+              response,
+              200,
+              previewReport(
+                store.state(),
+                LOCAL_OWNER,
+                input.projectId,
+                input.request,
+              ),
+            );
+          const report = savedReport(
+            store.state(),
+            LOCAL_OWNER,
+            input.projectId,
+            input.reportId,
+          );
+          if (url.pathname === "/api/reports/pdf")
+            return json(
+              response,
+              202,
+              exports.start(LOCAL_OWNER, input.projectId, report),
+            );
+          if (url.pathname === "/api/reports/pdf-status")
+            return json(
+              response,
+              200,
+              exports.status(LOCAL_OWNER, input.projectId, report),
+            );
+          if (url.pathname === "/api/reports/download") {
+            const formats = {
+              html: [
+                "text/html; charset=utf-8",
+                "html",
+                () => reportToHtml(report),
+              ],
+              jats: [
+                "application/xml; charset=utf-8",
+                "xml",
+                () => reportToJats(report),
+              ],
+              json: [
+                "application/json; charset=utf-8",
+                "json",
+                () => JSON.stringify(report, null, 2) + "\n",
+              ],
+              pdf: [
+                "application/pdf",
+                "pdf",
+                () => exports.download(LOCAL_OWNER, input.projectId, report),
+              ],
+            };
+            if (
+              typeof input.format !== "string" ||
+              !Object.hasOwn(formats, input.format)
+            )
+              throw fail(
+                "INVALID_FORMAT",
+                "请选择 HTML、PDF、JSON 或 JATS 格式。",
+                400,
+              );
+            const [contentType, extension, generate] = formats[input.format];
+            const bytes = generate();
+            const filename = `行简_报告${report.number}_${report.spec.title}.${extension}`;
+            response.writeHead(200, {
+              "Content-Type": contentType,
+              "Content-Disposition": `attachment; filename="xingjian-report-${report.number}.${extension}"; filename*=UTF-8''${encodeURIComponent(filename).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase())}`,
+              "Cache-Control": "no-store",
+            });
+            return response.end(bytes);
+          }
+          throw fail("NOT_FOUND", "报告接口不存在。", 404);
+        }
         if (
           request.method === "POST" &&
           url.pathname === "/api/analysis/catalog"
@@ -256,5 +342,9 @@ export function createApp(
   });
   server.requestTimeout = 15000;
   server.headersTimeout = 10000;
+  server.reportJobs = exports;
+  server.once("close", () => {
+    void exports.close();
+  });
   return server;
 }

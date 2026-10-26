@@ -8,9 +8,10 @@
 
 - [项目说明书与修改计划（原 Word）](行简研学_项目说明书与修改计划_20261023.docx)：保留原文件，包含整体构想与计划。
 - [可运行工程与使用指南](xingjian-workbench/README.md)：当前实现及操作入口。
-- [本阶段功能、实际截图和验证记录](xingjian-workbench/docs/PHASE-03B.md)：任务继续点、时间安排预览、课内提醒与失败恢复。
-- [后续开发路线](xingjian-workbench/docs/ROADMAP.md)：成果导出、AgentArts 接入等待办。
-- [本次同步说明](同步说明_20261025.md)：代码来源与保留范围。
+- [本阶段功能、实际截图和导出样例](xingjian-workbench/docs/PHASE-04.md)：选择章节、核对依据、保存报告版本、下载 HTML 与 PDF。
+- [上一阶段任务推进](xingjian-workbench/docs/PHASE-03B.md)：任务继续点、时间安排预览、课内提醒与失败恢复。
+- [后续开发路线](xingjian-workbench/docs/ROADMAP.md)：交互深化、AgentArts 接入等待办。
+- [本次同步说明](同步说明_20261026.md)：代码来源、验证与保留范围。
 
 ## 本地启动
 
@@ -25,7 +26,7 @@ npm start
 
 打开 http://127.0.0.1:8787，选择「体验一个示例」即可操作。示例为合成资料；你创建的内容保存在本机 `.runtime/workspace.json`，不提交到 GitHub。
 
-无需 DevEco 或手机原生 SDK。当前是单用户本地 Web 工作台；AgentArts、云模型与 JATS 排版尚未接入，也未部署在线服务。不能将本地验证视为华为云平台验收。原 Word 中的规划能力，以工程当前说明的已完成/待办状态为准。
+无需 DevEco 或手机原生 SDK。当前是单用户本地 Web 工作台；AgentArts、云模型与 JATS 排版尚未接入，也未部署在线服务。不能将本地验证视为华为云平台验收。已支持固定模板报告与 HTML/PDF 导出；PDF 调用电脑已有的 Chrome，缺少浏览器时可先使用 HTML，不自动安装环境。原 Word 中的规划能力，以工程当前说明的已完成/待办状态为准。
 
 ## 自动检查
 

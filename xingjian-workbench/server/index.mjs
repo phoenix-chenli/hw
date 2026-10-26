@@ -30,7 +30,7 @@ server.listen(port, "127.0.0.1", () =>
 );
 function shutdown() {
   server.close(() => {
-    store.close();
+    void server.reportJobs.close().then(() => store.close());
   });
   server.closeAllConnections();
 }

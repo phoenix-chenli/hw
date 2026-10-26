@@ -20,7 +20,9 @@ server.once("error", (err) => {
 });
 server.listen(8798, "127.0.0.1");
 function shutdown() {
-  server.close(() => cleanup());
+  server.close(() => {
+    void server.reportJobs.close().then(cleanup);
+  });
   server.closeAllConnections();
 }
 process.on("SIGINT", shutdown);

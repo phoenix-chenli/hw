@@ -44,7 +44,8 @@ test("local API honestly reports capabilities and serves durable state", async (
   ).json();
   assert.equal(capability.agentArts, "not-connected");
   assert.equal(capability.mode, "local-single-user");
-  assert.equal(capability.stage, 3);
+  assert.equal(capability.stage, 4);
+  assert.equal(capability.reportExport, "fixed-template-local");
   assert.equal(capability.sourceReview, "individual-versioned-review");
   assert.equal(capability.sourceAnalysis, "local-keyword-and-csv");
   const saved = await send("/api/commands", {

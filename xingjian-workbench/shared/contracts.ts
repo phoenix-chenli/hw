@@ -111,6 +111,7 @@ export interface Project {
   analyses?: AnalysisRun[];
   busySlots?: BusySlot[];
   plans?: WorkPlan[];
+  reports?: SavedReport[];
 }
 export interface Workspace {
   schemaVersion: 1;
@@ -153,7 +154,8 @@ export type CommandType =
   | "add_busy_slot"
   | "deactivate_busy_slot"
   | "confirm_plan"
-  | "cancel_plan";
+  | "cancel_plan"
+  | "save_report";
 export interface Command {
   operationId: string;
   expectedRevision: number;
@@ -285,4 +287,78 @@ export interface WorkPlan extends PlanPreview {
   id: string;
   createdAt: string;
   status: "confirmed" | "cancelled";
+}
+
+export interface ReportRequest {
+  title: string;
+  artifactIds: string[];
+  includeTasks: boolean;
+}
+export interface ReportWarning {
+  code: string;
+  message: string;
+}
+export interface ReportSpec {
+  schemaVersion: "report-spec-v1";
+  template: "research-progress-v1";
+  project: { id: string; title: string; goal: string; isDemo: boolean };
+  title: string;
+  sections: {
+    artifactId: string;
+    title: string;
+    content: string;
+    version: number;
+    needsReview: boolean;
+    reviewedAt: string | null;
+    claimIds: string[];
+  }[];
+  claims: {
+    claimId: string;
+    text: string;
+    version: number;
+    needsReview: boolean;
+    reviewedAt: string | null;
+    evidence: Evidence[];
+  }[];
+  sources: {
+    sourceId: string;
+    title: string;
+    kind: Source["kind"];
+    versionId: string;
+    versionNumber: number;
+    contentHash: string;
+    currentAtCapture: boolean;
+    currentVersionIdAtCapture: string;
+  }[];
+  tasks: {
+    taskId: string;
+    title: string;
+    status: Task["status"];
+    reviewRequired: boolean;
+    version: number;
+    claimIds: string[];
+    nextStep: string | null;
+    checkpointNumber: number;
+  }[];
+  warnings: ReportWarning[];
+}
+export interface ReportPreview {
+  projectId: string;
+  request: ReportRequest;
+  spec: ReportSpec;
+  previewToken: string;
+}
+export interface SavedReport extends ReportPreview {
+  id: string;
+  number: number;
+  createdAt: string;
+  contentHash: string;
+}
+export interface PdfJob {
+  status: "idle" | "running" | "ready" | "failed";
+  attempt: number;
+  error: string | null;
+  createdAt: string | null;
+  finishedAt: string | null;
+  engine: "chromium-print-v1";
 }

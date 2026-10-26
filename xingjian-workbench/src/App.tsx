@@ -55,6 +55,7 @@ import AnalysisPanel from "./AnalysisPanel";
 import ReviewDialog, { type ReviewTarget } from "./ReviewDialog";
 import TaskWorkDialog from "./TaskWorkDialog";
 import PlanningPanel from "./PlanningPanel";
+import ReportPanel from "./ReportPanel";
 
 type Page = "overview" | "materials" | "analysis" | "actions" | "artifacts";
 const navigationKey = "xingjian.navigation.v1";
@@ -795,7 +796,7 @@ export default function App() {
             <p>
               已支持资料版本、关键词检索、CSV
               受控计算、提案确认、逐项复核、任务继续点和本地计划预览。AgentArts
-              与 PDF 排版尚未接入。
+              尚未连接。已支持固定模板报告及使用现有浏览器生成 PDF。
             </p>
           </details>
         </div>
@@ -1543,8 +1544,8 @@ export default function App() {
                   <div className="info-strip">
                     <FileText size={17} />
                     <span>
-                      当前支持手工编写草稿与结论关联；暂未接入自动生成、文件导出和
-                      PDF 排版。
+                      先完善草稿与依据，再预览并保存报告版本。核查提示会随文件保留，PDF
+                      使用电脑已有浏览器生成。
                     </span>
                   </div>
                   {project.artifacts.length ? (
@@ -1570,13 +1571,26 @@ export default function App() {
                       </Empty>
                     </section>
                   )}
+                  <ReportPanel
+                    key={project.id}
+                    project={project}
+                    workspace={workspace!}
+                    onWorkspace={(state) =>
+                      setWorkspace((current) =>
+                        !current || state.revision >= current.revision
+                          ? state
+                          : current,
+                      )
+                    }
+                    onNotice={setNotice}
+                  />
                 </>
               )}
             </>
           )}
           <footer className="workspace-footer">
             <span>行简 · 让研究有据，行动有序</span>
-            <span>第三阶段 · 任务推进版</span>
+            <span>第四阶段 · 成果导出版</span>
           </footer>
         </main>
       </div>

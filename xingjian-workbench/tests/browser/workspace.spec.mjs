@@ -76,7 +76,7 @@ test("create project and hand-enter linked source, claim, task, and draft", asyn
   await page
     .getByLabel("草稿内容", { exact: true })
     .fill("待补实际数据，不形成正式结论。");
-  await page.getByRole("checkbox").check();
+  await page.getByRole("dialog").getByRole("checkbox").check();
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".artifact-card")).toHaveCount(1);
   await page.reload();

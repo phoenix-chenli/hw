@@ -19,6 +19,13 @@ import {
   buildPlanPreview,
   applyPlanningCommand,
 } from "./planning.mjs";
+import {
+  ReportError,
+  buildReportPreview,
+  saveReport,
+  validateReports,
+  getReport,
+} from "./reports.mjs";
 
 const LIMITS = Object.freeze({
   id: 160,
@@ -48,6 +55,7 @@ const COMMANDS = new Set([
   "deactivate_busy_slot",
   "confirm_plan",
   "cancel_plan",
+  "save_report",
 ]);
 
 export class DomainError extends Error {
@@ -246,6 +254,7 @@ export function validateWorkspace(state) {
           fail("关联待核对结论的草稿必须标记为待核对。");
       }
       validatePlanningState(project, register);
+      validateReports(project, register);
       for (const entry of array(project.activity, "活动记录")) {
         record(entry, "活动记录");
         register(entry.id, "活动 ID");
@@ -269,7 +278,8 @@ export function validateWorkspace(state) {
       error instanceof DomainError ||
       error instanceof AnalysisError ||
       error instanceof ReviewError ||
-      error instanceof PlanningError
+      error instanceof PlanningError ||
+      error instanceof ReportError
     )
       throw new DomainError(
         "INVALID_STATE",
@@ -315,6 +325,16 @@ export function previewPlan(state, ownerId, projectId, request) {
     ownedProject(state, ownerId, projectId),
     request,
   );
+}
+
+export function previewReport(state, ownerId, projectId, request) {
+  validateWorkspace(state);
+  return buildReportPreview(ownedProject(state, ownerId, projectId), request);
+}
+
+export function savedReport(state, ownerId, projectId, reportId) {
+  const project = ownedProject(state, ownerId, projectId);
+  return getReport(project, reportId);
 }
 
 function impactFor(project, source, nextContent) {
@@ -544,7 +564,15 @@ export function applyCommand(state, ownerId, type, payload, options = {}) {
   } else {
     project = ownedProject(next, owner, payload.projectId);
     const claimMap = new Map(project.claims.map((entry) => [entry.id, entry]));
-    if (
+    if (type === "save_report") {
+      const report = saveReport(project, payload, ctx);
+      entityId = report.id;
+      addActivity(
+        project,
+        `保存第 ${report.number} 份报告快照；保留资料版本与核查提示，不改变原草稿或任务进度。`,
+        ctx,
+      );
+    } else if (
       [
         "save_checkpoint",
         "add_busy_slot",

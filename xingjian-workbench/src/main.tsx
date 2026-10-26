@@ -5,6 +5,7 @@ import "./styles.css";
 import "./analysis.css";
 import "./review.css";
 import "./task-work.css";
+import "./report.css";
 import "./planning.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
