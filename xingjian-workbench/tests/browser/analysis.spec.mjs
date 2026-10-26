@@ -101,7 +101,9 @@ test("calculation proposal is reviewable and confirmed once after a lost respons
     "已加入 1 条结论、1 项行动",
   );
   await page.locator(".analysis-evidence").click();
-  await expect(page.locator(".source-content")).toContainText("A,0.1");
+  await expect(
+    page.locator(".evidence-dialog .evidence-content"),
+  ).toContainText("A,0.1");
 });
 
 test("source edit while viewing a proposal requires refresh and rerun before acceptance", async ({

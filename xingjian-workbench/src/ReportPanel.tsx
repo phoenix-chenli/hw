@@ -29,6 +29,12 @@ import {
   type ReportFormat,
 } from "./report-api";
 
+type EvidenceOpener = (
+  sourceId: string,
+  versionId: string,
+  details?: { locator?: string; claimId?: string },
+) => void;
+
 const statusText = { todo: "待开始", doing: "进行中", done: "已完成" };
 const contentVersion = (item: { revisions?: { number: number }[] }) =>
   item.revisions?.at(-1)?.number ?? 1;
@@ -104,7 +110,13 @@ function changedSinceCapture(project: Project, report: SavedReport) {
   );
 }
 
-function ReportContents({ spec }: { spec: ReportSpec }) {
+function ReportContents({
+  spec,
+  onEvidence,
+}: {
+  spec: ReportSpec;
+  onEvidence: EvidenceOpener;
+}) {
   const sourceLabel = (sourceId: string, versionId: string) => {
     const ref = spec.sources.find(
       (source) =>
@@ -160,8 +172,23 @@ function ReportContents({ spec }: { spec: ReportSpec }) {
                   <li
                     key={`${evidence.sourceId}-${evidence.versionId}-${evidenceIndex}`}
                   >
-                    {sourceLabel(evidence.sourceId, evidence.versionId)}
-                    {evidence.locator && <span>定位：{evidence.locator}</span>}
+                    <button
+                      type="button"
+                      className="evidence-link"
+                      onClick={() =>
+                        onEvidence(evidence.sourceId, evidence.versionId, {
+                          locator: evidence.locator,
+                          claimId: claim.claimId,
+                        })
+                      }
+                    >
+                      <span>
+                        {sourceLabel(evidence.sourceId, evidence.versionId)}
+                        {evidence.locator && (
+                          <span>定位：{evidence.locator}</span>
+                        )}
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -216,10 +243,12 @@ function SavedReportCard({
   project,
   report,
   onNotice,
+  onEvidence,
 }: {
   project: Project;
   report: SavedReport;
   onNotice: (message: string) => void;
+  onEvidence: EvidenceOpener;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [pdf, setPdf] = useState<PdfJob | null>(null);
@@ -448,7 +477,7 @@ function SavedReportCard({
       {expanded && (
         <div className="report-snapshot">
           <Warnings spec={report.spec} />
-          <ReportContents spec={report.spec} />
+          <ReportContents spec={report.spec} onEvidence={onEvidence} />
         </div>
       )}
       <details className="report-technical">
@@ -485,11 +514,13 @@ export default function ReportPanel({
   workspace,
   onWorkspace,
   onNotice,
+  onEvidence,
 }: {
   project: Project;
   workspace: Workspace;
   onWorkspace: (state: Workspace) => void;
   onNotice: (message: string) => void;
+  onEvidence: EvidenceOpener;
 }) {
   const prefix = useId();
   const [title, setTitle] = useState(() =>
@@ -803,7 +834,7 @@ export default function ReportPanel({
               </span>
             </header>
             <Warnings spec={preview.spec} />
-            <ReportContents spec={preview.spec} />
+            <ReportContents spec={preview.spec} onEvidence={onEvidence} />
             {!!preview.spec.warnings.length && (
               <label className="report-check report-ack">
                 <input
@@ -862,6 +893,7 @@ export default function ReportPanel({
                 project={project}
                 report={report}
                 onNotice={onNotice}
+                onEvidence={onEvidence}
               />
             ))
           ) : (

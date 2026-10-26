@@ -142,9 +142,9 @@ test("concurrent source change keeps draft and requires a fresh preview", async 
   await expect(page.getByRole("alert")).toContainText("输入已保留");
   await expect(page.getByLabel("更新后的资料内容")).toHaveValue(myDraft);
   await page.getByRole("button", { name: "预览变更影响", exact: true }).click();
-  await expect(page.locator(".diff-content").first()).toContainText(
-    "另一页面已保存",
-  );
+  await expect(
+    page.getByRole("region", { name: "保存前资料差异", exact: true }),
+  ).toContainText("另一页面已保存");
   await page
     .getByRole("button", { name: "确认保存新版本", exact: true })
     .click();

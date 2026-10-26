@@ -56,6 +56,10 @@ import ReviewDialog, { type ReviewTarget } from "./ReviewDialog";
 import TaskWorkDialog from "./TaskWorkDialog";
 import PlanningPanel from "./PlanningPanel";
 import ReportPanel from "./ReportPanel";
+import EvidenceDialog from "./EvidenceDialog";
+import SourceVersionCompare from "./SourceVersionCompare";
+import TextDiff from "./TextDiff";
+import type { EvidenceTarget } from "./evidence-types";
 
 type Page = "overview" | "materials" | "analysis" | "actions" | "artifacts";
 const navigationKey = "xingjian.navigation.v1";
@@ -183,6 +187,9 @@ export default function App() {
   const [modal, setModal] = useState<Modal | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [workTaskId, setWorkTaskId] = useState<string | null>(null);
+  const [evidenceTarget, setEvidenceTarget] = useState<EvidenceTarget | null>(
+    null,
+  );
   const [fields, setFields] = useState<Fields>(emptyFields);
   const [formError, setFormError] = useState("");
   const [preview, setPreview] = useState<ImpactPreview | null>(null);
@@ -273,6 +280,7 @@ export default function App() {
     setSidebarOpen(false);
   }
   function selectProject(id: string) {
+    setEvidenceTarget(null);
     setProjectId(id);
     setSelectedSourceId("");
     setSelectedVersionId("");
@@ -280,10 +288,12 @@ export default function App() {
     setSidebarOpen(false);
     setNotice("");
   }
-  function viewEvidence(sourceId: string, versionId: string) {
-    setSelectedSourceId(sourceId);
-    setSelectedVersionId(versionId);
-    navigate("materials");
+  function viewEvidence(
+    sourceId: string,
+    versionId: string,
+    details: Omit<EvidenceTarget, "sourceId" | "versionId"> = {},
+  ) {
+    setEvidenceTarget({ sourceId, versionId, ...details });
   }
 
   async function mutate(
@@ -514,6 +524,7 @@ export default function App() {
                   viewEvidence(
                     claim.evidence[0].sourceId,
                     claim.evidence[0].versionId,
+                    { locator: claim.evidence[0].locator, claimId: claim.id },
                   );
               }}
             >
@@ -796,7 +807,8 @@ export default function App() {
             <p>
               已支持资料版本、关键词检索、CSV
               受控计算、提案确认、逐项复核、任务继续点和本地计划预览。AgentArts
-              尚未连接。已支持固定模板报告及使用现有浏览器生成 PDF。
+              尚未连接。已支持原文依据查看、资料版本差异、固定模板报告及使用现有浏览器生成
+              PDF。
             </p>
           </details>
         </div>
@@ -1360,6 +1372,11 @@ export default function App() {
                         <div className="plain-content source-content">
                           {visibleVersion.content}
                         </div>
+                        <SourceVersionCompare
+                          key={`${source.id}-${visibleVersion.id}`}
+                          source={source}
+                          visibleVersionId={visibleVersion.id}
+                        />
                       </section>
                     )}
                     <section className="panel claims-panel">
@@ -1424,6 +1441,10 @@ export default function App() {
                                       viewEvidence(
                                         evidence.sourceId,
                                         evidence.versionId,
+                                        {
+                                          locator: evidence.locator,
+                                          claimId: claim.id,
+                                        },
                                       )
                                     }
                                   >
@@ -1583,6 +1604,7 @@ export default function App() {
                       )
                     }
                     onNotice={setNotice}
+                    onEvidence={viewEvidence}
                   />
                 </>
               )}
@@ -1590,7 +1612,7 @@ export default function App() {
           )}
           <footer className="workspace-footer">
             <span>行简 · 让研究有据，行动有序</span>
-            <span>第四阶段 · 成果导出版</span>
+            <span>第五阶段 · 依据核对版</span>
           </footer>
         </main>
       </div>
@@ -1608,10 +1630,7 @@ export default function App() {
             )
           }
           onComplete={setNotice}
-          onEvidence={(sourceId, versionId) => {
-            setReviewTarget(null);
-            viewEvidence(sourceId, versionId);
-          }}
+          onEvidence={viewEvidence}
         />
       )}
       {workTaskId && project && workspace && (
@@ -1627,10 +1646,7 @@ export default function App() {
             )
           }
           onNotice={setNotice}
-          onEvidence={(sourceId, versionId) => {
-            setWorkTaskId(null);
-            viewEvidence(sourceId, versionId);
-          }}
+          onEvidence={viewEvidence}
         />
       )}
       {modal && (
@@ -1919,20 +1935,13 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <div className="diff-grid">
-                      <section>
-                        <h3>当前内容</h3>
-                        <div className="plain-content diff-content">
-                          {preview.previousContent}
-                        </div>
-                      </section>
-                      <section>
-                        <h3>修改后内容</h3>
-                        <div className="plain-content diff-content">
-                          {preview.nextContent}
-                        </div>
-                      </section>
-                    </div>
+                    <TextDiff
+                      label="保存前资料差异"
+                      before={preview.previousContent}
+                      after={preview.nextContent}
+                      beforeLabel="当前内容"
+                      afterLabel="修改后内容"
+                    />
                     <div className="impact-groups">
                       {[
                         { title: "关联结论", items: preview.claims },
@@ -2021,6 +2030,14 @@ export default function App() {
             </div>
           </form>
         </dialog>
+      )}
+      {evidenceTarget && project && (
+        <EvidenceDialog
+          key={`${project.id}-${JSON.stringify(evidenceTarget)}`}
+          project={project}
+          target={evidenceTarget}
+          onClose={() => setEvidenceTarget(null)}
+        />
       )}
     </div>
   );

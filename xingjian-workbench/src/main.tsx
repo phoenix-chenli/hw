@@ -6,6 +6,7 @@ import "./analysis.css";
 import "./review.css";
 import "./task-work.css";
 import "./report.css";
+import "./evidence-integration.css";
 import "./planning.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

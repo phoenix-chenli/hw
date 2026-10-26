@@ -121,7 +121,9 @@ export function createApp(
         if (request.method === "GET" && url.pathname === "/api/capabilities")
           return json(response, 200, {
             mode: "local-single-user",
-            stage: 4,
+            stage: 5,
+            evidenceInspection: "recorded-text-positions",
+            sourceComparison: "bounded-line-diff",
             agentArts: "not-connected",
             reportExport: "fixed-template-local",
             pdfEngine: "existing-browser-worker",

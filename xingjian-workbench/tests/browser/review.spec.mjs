@@ -153,7 +153,17 @@ test("review claim, completed task and draft separately; preserve histories, ori
     .click();
   await expect(page.locator(".review-history")).toContainText(p.claims[0].text);
   await page.locator(".review-history .evidence-link").last().click();
-  await expect(page.locator(".source-content")).toContainText("A教室,60");
+  await expect(
+    page.locator(".evidence-dialog .evidence-content"),
+  ).toContainText("A教室,60");
+  await page
+    .locator(".evidence-dialog")
+    .getByRole("button", { name: "返回继续核对", exact: true })
+    .click();
+  await page
+    .locator(".review-dialog")
+    .getByRole("button", { name: "关闭", exact: true })
+    .click();
   saved = (await state(request)).projects.find((item) => item.id === p.id);
   expect(saved.claims[0].revisions[0].evidence).toEqual(p.claims[0].evidence);
   expect(saved.tasks[0].status).toBe("done");
@@ -200,9 +210,9 @@ test("review claim, completed task and draft separately; preserve histories, ori
   await expect(pinned).toContainText("新版合成数据中 A 为 55、B 为 45");
   await expect(pinned).not.toContainText("第三版合成数据 A=50");
   await pinned.getByRole("button").first().click();
-  await expect(page.locator(".source-content")).toContainText(
-    "第二版合成用电资料：A=55",
-  );
+  await expect(
+    page.locator(".evidence-dialog .evidence-content"),
+  ).toContainText("第二版合成用电资料：A=55");
 });
 
 test("source changes during review preserve input and require explicit refreshed comparison", async ({
@@ -231,7 +241,7 @@ test("source changes during review preserve input and require explicit refreshed
   await page
     .getByRole("button", { name: "重新对照最新依据", exact: true })
     .click();
-  await expect(page.locator(".review-compare-grid")).toContainText(
+  await expect(page.locator(".review-comparisons .text-diff")).toContainText(
     "第三版合成资料",
   );
   await expect(page.getByLabel("复核后的结论", { exact: true })).toHaveValue(

@@ -303,7 +303,14 @@ test("checkpoint restores next step and original source without changing complet
   );
   await page.locator(".work-history > summary").click();
   await page.locator(".work-history .evidence-link").click();
-  await expect(page.locator(".source-content")).toContainText("A教室,60");
+  await expect(
+    page.locator(".evidence-dialog .evidence-content"),
+  ).toContainText("A教室,60");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".task-work-dialog")).toBeVisible();
+  await expect(page.getByLabel("下次第一步", { exact: true })).toHaveValue(
+    "核对 A 教室使用时长",
+  );
   const saved = (await state(request)).projects
     .find((item) => item.id === project.id)
     .tasks.find((item) => item.id === task.id);

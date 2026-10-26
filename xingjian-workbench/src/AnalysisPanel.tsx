@@ -24,6 +24,7 @@ import {
   makeCommand,
   submitCommand,
 } from "./api";
+import type { EvidenceTarget } from "./evidence-types";
 
 const operations = {
   sum: "合计",
@@ -49,7 +50,11 @@ export default function AnalysisPanel({
   project: Project;
   workspace: Workspace;
   onWorkspace: (state: Workspace) => void;
-  onEvidence: (sourceId: string, versionId: string) => void;
+  onEvidence: (
+    sourceId: string,
+    versionId: string,
+    details?: Omit<EvidenceTarget, "sourceId" | "versionId">,
+  ) => void;
   onAddSource: () => void;
 }) {
   const [mode, setMode] = useState<"search" | "calculate">("search");
@@ -584,7 +589,11 @@ export default function AnalysisPanel({
                           key={ref.sourceId + ref.locator}
                           type="button"
                           onClick={() =>
-                            onEvidence(ref.sourceId, ref.versionId)
+                            onEvidence(ref.sourceId, ref.versionId, {
+                              locator: ref.locator,
+                              analysisId: run.id,
+                              candidateId: candidate.id,
+                            })
                           }
                         >
                           <FileText size={16} />

@@ -24,6 +24,8 @@ import {
   previewReview,
   submitCommand,
 } from "./api";
+import TextDiff from "./TextDiff";
+import type { EvidenceTarget } from "./evidence-types";
 
 export type ReviewTarget = {
   kind: "claim" | "task" | "artifact";
@@ -80,7 +82,11 @@ export default function ReviewDialog({
   onClose: () => void;
   onWorkspace: (state: Workspace) => void;
   onSwitch: (target: ReviewTarget) => void;
-  onEvidence: (sourceId: string, versionId: string) => void;
+  onEvidence: (
+    sourceId: string,
+    versionId: string,
+    details?: Omit<EvidenceTarget, "sourceId" | "versionId">,
+  ) => void;
   onComplete: (message: string) => void;
 }) {
   const entity = getEntity(project, target);
@@ -329,43 +335,63 @@ export default function ReviewDialog({
                             : "资料已有新版本"}
                         </span>
                       </summary>
-                      <div className="review-compare-grid">
-                        <div>
-                          <h4>
-                            原先使用的资料 · v
-                            {
-                              project.sources
-                                .find((item) => item.id === source.sourceId)
-                                ?.versions.find(
-                                  (item) =>
-                                    item.id === source.previousVersionId,
-                                )?.number
-                            }
-                          </h4>
-                          <pre
-                            tabIndex={0}
-                            aria-label={`原资料：${source.title}`}
-                          >
-                            {source.previousContent}
-                          </pre>
-                        </div>
-                        <div>
-                          <h4>
-                            当前资料 · v
-                            {project.sources
-                              .find((item) => item.id === source.sourceId)
-                              ?.versions.find(
-                                (item) => item.id === source.currentVersionId,
-                              )?.number ?? "最新"}
-                          </h4>
-                          <pre
-                            tabIndex={0}
-                            aria-label={`当前资料：${source.title}`}
-                          >
-                            {source.currentContent}
-                          </pre>
-                        </div>
+                      <div className="review-source-actions">
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() =>
+                            onEvidence(
+                              source.sourceId,
+                              source.previousVersionId,
+                              {
+                                locator:
+                                  preview.kind === "claim"
+                                    ? preview.baseline.evidence.find(
+                                        (ref) =>
+                                          ref.sourceId === source.sourceId &&
+                                          ref.versionId ===
+                                            source.previousVersionId,
+                                      )?.locator
+                                    : undefined,
+                                claimId:
+                                  target.kind === "claim"
+                                    ? target.entityId
+                                    : undefined,
+                              },
+                            )
+                          }
+                        >
+                          查看原版依据 <ArrowRight size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() =>
+                            onEvidence(
+                              source.sourceId,
+                              source.currentVersionId,
+                              {
+                                locator: draft.evidence?.find(
+                                  (ref) => ref.sourceId === source.sourceId,
+                                )?.locator,
+                                claimId:
+                                  target.kind === "claim"
+                                    ? target.entityId
+                                    : undefined,
+                              },
+                            )
+                          }
+                        >
+                          查看当前版依据 <ArrowRight size={14} />
+                        </button>
                       </div>
+                      <TextDiff
+                        label={`资料新旧差异：${source.title}`}
+                        before={source.previousContent}
+                        after={source.currentContent}
+                        beforeLabel={`原先使用的资料 · v${project.sources.find((item) => item.id === source.sourceId)?.versions.find((item) => item.id === source.previousVersionId)?.number ?? "?"}`}
+                        afterLabel={`当前资料 · v${project.sources.find((item) => item.id === source.sourceId)?.versions.find((item) => item.id === source.currentVersionId)?.number ?? "?"}`}
+                      />
                     </details>
                   ))}
                 </section>
@@ -550,7 +576,15 @@ export default function ReviewDialog({
                       type="button"
                       className="evidence-link"
                       key={index}
-                      onClick={() => onEvidence(ref.sourceId, ref.versionId)}
+                      onClick={() =>
+                        onEvidence(ref.sourceId, ref.versionId, {
+                          locator: ref.locator,
+                          claimId:
+                            target.kind === "claim"
+                              ? target.entityId
+                              : undefined,
+                        })
+                      }
                     >
                       {
                         project.sources.find(
@@ -596,7 +630,14 @@ export default function ReviewDialog({
                             className="evidence-link"
                             key={index}
                             onClick={() =>
-                              onEvidence(evidence.sourceId, evidence.versionId)
+                              onEvidence(
+                                evidence.sourceId,
+                                evidence.versionId,
+                                {
+                                  locator: evidence.locator,
+                                  claimId: claim?.id,
+                                },
+                              )
                             }
                           >
                             {

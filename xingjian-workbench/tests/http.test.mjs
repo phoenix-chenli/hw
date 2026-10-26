@@ -44,7 +44,9 @@ test("local API honestly reports capabilities and serves durable state", async (
   ).json();
   assert.equal(capability.agentArts, "not-connected");
   assert.equal(capability.mode, "local-single-user");
-  assert.equal(capability.stage, 4);
+  assert.equal(capability.stage, 5);
+  assert.equal(capability.evidenceInspection, "recorded-text-positions");
+  assert.equal(capability.sourceComparison, "bounded-line-diff");
   assert.equal(capability.reportExport, "fixed-template-local");
   assert.equal(capability.sourceReview, "individual-versioned-review");
   assert.equal(capability.sourceAnalysis, "local-keyword-and-csv");

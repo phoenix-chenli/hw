@@ -8,10 +8,11 @@
 
 - [项目说明书与修改计划（原 Word）](行简研学_项目说明书与修改计划_20261023.docx)：保留原文件，包含整体构想与计划。
 - [可运行工程与使用指南](xingjian-workbench/README.md)：当前实现及操作入口。
-- [本阶段功能、实际截图和导出样例](xingjian-workbench/docs/PHASE-04.md)：选择章节、核对依据、保存报告版本、下载 HTML 与 PDF。
+- [本阶段功能与实际截图](xingjian-workbench/docs/PHASE-05A.md)：原地查看引用原文、保留未保存填写、对比新旧资料和版本内查找。
+- [报告导出与样例](xingjian-workbench/docs/PHASE-04.md)：选择章节、核对依据、保存报告版本、下载 HTML 与 PDF。
 - [上一阶段任务推进](xingjian-workbench/docs/PHASE-03B.md)：任务继续点、时间安排预览、课内提醒与失败恢复。
 - [后续开发路线](xingjian-workbench/docs/ROADMAP.md)：交互深化、AgentArts 接入等待办。
-- [本次同步说明](同步说明_20261026.md)：代码来源、验证与保留范围。
+- [本次同步说明](同步说明_第五阶段A_20261026.md)：代码来源、验证与保留范围。
 
 ## 本地启动
 
